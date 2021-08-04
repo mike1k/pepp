@@ -483,3 +483,19 @@ void ImportDirectory<bitsize>::TraverseImports(const std::function<void(ModuleIm
 		descriptor++;
 	}
 }
+
+template<unsigned int bitsize>
+void ImportDirectory<bitsize>::GetIATOffsets(std::uint32_t& begin, std::uint32_t& end) noexcept
+{
+	//
+	// Null out.
+	begin = end = 0;
+
+	IMAGE_DATA_DIRECTORY const& iat = m_image->GetPEHeader().GetOptionalHeader().GetDataDirectory(IMAGE_DIRECTORY_ENTRY_IAT);
+	if (iat.Size == 0)
+		return;
+
+
+	begin = m_image->GetPEHeader().RvaToOffset(iat.VirtualAddress);
+	end = begin + iat.Size;
+}

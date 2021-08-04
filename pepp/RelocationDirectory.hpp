@@ -100,6 +100,7 @@ namespace pepp
 		int			GetNumberOfBlocks() const;
 		int			GetNumberOfEntries(detail::Image_t<>::RelocationBase_t* reloc) const;
 		std::uint32_t	GetRemainingFreeBytes() const;
+		bool			ChangeRelocationType(std::uint32_t rva, RelocationType type);
 		std::vector<BlockEntry> GetBlockEntries(int blockIdx);
 		BlockStream CreateBlock(std::uint32_t rva, std::uint32_t num_entries);
 

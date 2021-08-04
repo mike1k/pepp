@@ -45,6 +45,33 @@ std::uint32_t RelocationDirectory<bitsize>::GetRemainingFreeBytes() const
 }
 
 template<unsigned int bitsize>
+bool pepp::RelocationDirectory<bitsize>::ChangeRelocationType(std::uint32_t rva, RelocationType type)
+{
+	auto base = m_base;
+	std::vector<BlockEntry> entries;
+
+	while (base->VirtualAddress)
+	{
+		int numEntries = GetNumberOfEntries(base);
+		std::uint16_t* entry = (std::uint16_t*)(base + 1);
+
+		for (int i = 0; i != numEntries; i++, entry++)
+		{
+			BlockEntry block(base->VirtualAddress, *entry);
+			if (block.GetRva() == rva)
+			{
+				*entry = CraftRelocationBlockEntry(type, block.GetOffset());
+				return true;
+			}
+		}
+
+		base = decltype(base)((char*)base + base->SizeOfBlock);
+	}
+
+	return false;
+}
+
+template<unsigned int bitsize>
 std::vector<BlockEntry> RelocationDirectory<bitsize>::GetBlockEntries(int blockIdx)
 {
 	auto base = m_base;
@@ -68,7 +95,7 @@ std::vector<BlockEntry> RelocationDirectory<bitsize>::GetBlockEntries(int blockI
 		count++;
 	}
 
-	return std::move(entries);
+	return entries;
 }
 
 template<unsigned int bitsize>

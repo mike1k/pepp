@@ -307,7 +307,7 @@ std::vector<std::uint32_t> Image<bitsize>::FindBinarySequence(SectionHeader* s, 
 	std::uint32_t result = 0;
 	std::uint32_t match_count = 0;
 
-	for (std::uint32_t i = start_offset; i <= start_offset + s->GetSizeOfRawData();)
+	for (std::uint32_t i = start_offset; i <= start_offset + s->GetSizeOfRawData(); ++i)
 	{
 		for (int c = 0; c < binary_seq.size();)
 		{
@@ -337,9 +337,10 @@ std::vector<std::uint32_t> Image<bitsize>::FindBinarySequence(SectionHeader* s, 
 		if (result)
 		{
 			offsets.emplace_back(i);
+			i += match_count - 1;
 		}
 
-		i += std::max<int>(match_count, 1);
+		
 		match_count = 0;
 		result = 0;
 	}
@@ -367,7 +368,7 @@ std::vector<std::pair<std::int32_t, std::uint32_t>> Image<bitsize>::FindBinarySe
 	std::pair<std::int32_t, std::uint32_t> result{};
 	std::uint32_t match_count = 0;
 
-	for (std::uint32_t i = start_offset; i <= start_offset + s->GetSizeOfRawData();)
+	for (std::uint32_t i = start_offset; i <= start_offset + s->GetSizeOfRawData(); ++i)
 	{
 		for (auto const& seq : binary_seq)
 		{
@@ -408,8 +409,7 @@ std::vector<std::pair<std::int32_t, std::uint32_t>> Image<bitsize>::FindBinarySe
 			result = { 0, 0 };
 		}
 
-
-		i += std::max<int>(match_count, 1);
+		i += std::max<int>(match_count - 1, 0);
 		match_count = 0;
 	}
 

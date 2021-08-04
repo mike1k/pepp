@@ -61,6 +61,8 @@ namespace pepp
 			return (ord & IMPORT_ORDINAL_FLAG_32) != 0;
 		}
 
+		void GetIATOffsets(std::uint32_t& begin, std::uint32_t& end) noexcept;
+
 	private:
 		//! Setup the directory
 		void _setup(Image<bitsize>* image) {

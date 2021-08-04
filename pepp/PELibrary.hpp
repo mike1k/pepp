@@ -11,6 +11,7 @@
 #include "misc/NonCopyable.hpp"
 #include "misc/ByteVector.hpp"
 #include "misc/Concept.hpp"
+#include "misc/Address.hpp"
 
 #include "Image.hpp"
 #include "PEHeader.hpp"
