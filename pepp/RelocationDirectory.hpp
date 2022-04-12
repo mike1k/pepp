@@ -25,8 +25,8 @@ namespace pepp
 		REL_BASED_DIR64              =    10
 	};
 
-	constexpr std::uint16_t CraftRelocationBlockEntry(RelocationType type, std::uint16_t offset) noexcept {
-		return (offset & 0xfff) | (type << 12);
+	constexpr std::uint16_t craftRelocationBlockEntry(RelocationType type, std::uint16_t offset) noexcept {
+		return offset | (type << 12);
 	}
 
 	class BlockEntry
@@ -40,20 +40,20 @@ namespace pepp
 		{
 		}
 
-		RelocationType GetType() const
+		RelocationType getType() const
 		{
 			return static_cast<RelocationType>(m_entry >> 12);
 		}
 
-		std::uint32_t GetOffset() const
+		std::uint32_t getOffset() const
 		{
 			// Single out the last 12 bits of the entry
 			return static_cast<std::uint32_t>(m_entry & ((1 << 12) - 1));
 		}
 
-		std::uint32_t GetRva() const
+		std::uint32_t getRva() const
 		{
-			return m_va + GetOffset();
+			return m_va + getOffset();
 		}
 
 		constexpr operator std::uint16_t() const
@@ -66,21 +66,47 @@ namespace pepp
 	{
 		std::uint16_t*						 m_base;
 		std::uint32_t					     m_idx;
-		std::uint32_t						 m_max_size;
+		detail::Image_t<>::RelocationBase_t* m_reloc;
 	public:
-		BlockStream(detail::Image_t<>::RelocationBase_t* reloc)
-			: m_base((std::uint16_t*)(reloc+1))
+		BlockStream()
+			: m_base(nullptr)
 			, m_idx(0)
-			, m_max_size(reloc->SizeOfBlock)
+			, m_reloc(nullptr)
 		{
 		}
 
-		void Push(RelocationType type, std::uint16_t offset)
+		BlockStream(detail::Image_t<>::RelocationBase_t* reloc)
+			: m_base((std::uint16_t*)(reloc + 1))
+			, m_idx(0)
+			, m_reloc(reloc)
 		{
-			if (m_idx * sizeof(uint16_t) >= m_max_size)
+			while (m_base[m_idx])
+			{
+				++m_idx;
+			}
+		}
+
+		void append(RelocationType type, std::uint16_t offset)
+		{
+			if (m_base == nullptr)
 				return;
 
-			m_base[m_idx++] = CraftRelocationBlockEntry(type, offset);
+			if (m_idx * sizeof(uint16_t) >= (m_reloc->SizeOfBlock - sizeof(*m_reloc)))
+			{
+				__debugbreak();
+			}
+
+			m_base[m_idx++] = craftRelocationBlockEntry(type, offset);
+		}
+
+		std::uint32_t index() const
+		{
+			return m_idx;
+		}
+
+		bool valid() const
+		{
+			return m_base != nullptr;
 		}
 	};
 
@@ -97,25 +123,33 @@ namespace pepp
 		SectionHeader*							m_section;
 	public:
 
-		int			GetNumberOfBlocks() const;
-		int			GetNumberOfEntries(detail::Image_t<>::RelocationBase_t* reloc) const;
-		std::uint32_t	GetRemainingFreeBytes() const;
-		bool			ChangeRelocationType(std::uint32_t rva, RelocationType type);
-		std::vector<BlockEntry> GetBlockEntries(int blockIdx);
-		BlockStream CreateBlock(std::uint32_t rva, std::uint32_t num_entries);
+		int			getNumBlocks() const;
+		int			getNumEntries(detail::Image_t<>::RelocationBase_t* reloc) const;
+		std::uint32_t	getRemainingFreeBytes() const;
+		bool			changeRelocationType(std::uint32_t rva, RelocationType type);
+		std::vector<BlockEntry> getBlockEntries(int blockIdx);
+		BlockStream createBlock(std::uint32_t rva, std::uint32_t num_entries);
+		BlockStream getBlockStream(std::uint32_t rva);
+		void extend(std::uint32_t num_entries);
+		void forEachEntry(std::function<void(BlockEntry&)> Callback);
+		bool isRelocationPresent(std::uint32_t rva) const;
+		std::uint32_t getTotalBlockSize();
+		void increaseBlockSize(std::uint32_t rva, std::uint32_t num_entries);
+		void adjustBlockToFit(uint32_t delta);
+		detail::Image_t<>::RelocationBase_t* getBase() { return m_base; }
 
-		bool IsPresent() const {
-			return m_image->GetPEHeader().GetOptionalHeader().GetDataDirectory(DIRECTORY_ENTRY_BASERELOC).Size > 0;
+		bool isPresent() const {
+			return m_image->getPEHdr().getOptionalHdr().getDataDir(DIRECTORY_ENTRY_BASERELOC).Size > 0;
 		}
 	private:
 		//! Setup the directory
 		void _setup(Image<bitsize>* image) {
 			m_image = image;
 			m_base = reinterpret_cast<decltype(m_base)>(
-				&image->base()[image->GetPEHeader().RvaToOffset(
-					image->GetPEHeader().GetOptionalHeader().GetDataDirectory(DIRECTORY_ENTRY_BASERELOC).VirtualAddress)]);
+				&image->base()[image->getPEHdr().rvaToOffset(
+					image->getPEHdr().getOptionalHdr().getDataDir(DIRECTORY_ENTRY_BASERELOC).VirtualAddress)]);
 			m_section = 
-				&image->GetSectionHeaderFromVa(image->GetPEHeader().GetOptionalHeader().GetDataDirectory(DIRECTORY_ENTRY_BASERELOC).VirtualAddress);
+				&image->getSectionHdrFromVa(image->getPEHdr().getOptionalHdr().getDataDir(DIRECTORY_ENTRY_BASERELOC).VirtualAddress);
 		}
 	};
 }

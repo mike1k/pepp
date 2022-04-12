@@ -8,13 +8,13 @@ template class ImportDirectory<32>;
 template class ImportDirectory<64>;
 
 template<unsigned int bitsize>
-bool ImportDirectory<bitsize>::ImportsModule(std::string_view module, std::uint32_t* name_rva) const
+bool ImportDirectory<bitsize>::importsModule(std::string_view module, std::uint32_t* name_rva) const
 {
 	auto descriptor = m_base;
 	mem::ByteVector const* buffer = &m_image->buffer();
 
 	while (descriptor->FirstThunk != 0) {
-		std::uint32_t offset = m_image->GetPEHeader().RvaToOffset(descriptor->Name);
+		std::uint32_t offset = m_image->getPEHdr().rvaToOffset(descriptor->Name);
 
 		std::string_view modname = buffer->as<const char*>(offset);
 
@@ -36,19 +36,19 @@ bool ImportDirectory<bitsize>::ImportsModule(std::string_view module, std::uint3
 }
 
 template<unsigned int bitsize>
-bool ImportDirectory<bitsize>::HasModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva) const
+bool ImportDirectory<bitsize>::hasModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva) const
 {
 	auto descriptor = m_base;
 	mem::ByteVector const* buffer = &m_image->buffer();
 
 	while (descriptor->Characteristics != 0) {
-		std::uint32_t offset = m_image->GetPEHeader().RvaToOffset(descriptor->Name);
+		std::uint32_t offset = m_image->getPEHdr().rvaToOffset(descriptor->Name);
 
 		if (_stricmp(buffer->as<const char*>(offset), module.data()) == 0)
 		{
 			std::int32_t index = 0;
 			typename detail::Image_t<bitsize>::ThunkData_t* firstThunk =
-				buffer->as<decltype(firstThunk)>(m_image->GetPEHeader().RvaToOffset(descriptor->OriginalFirstThunk));
+				buffer->as<decltype(firstThunk)>(m_image->getPEHdr().rvaToOffset(descriptor->OriginalFirstThunk));
 
 			while (firstThunk->u1.AddressOfData)
 			{
@@ -62,12 +62,12 @@ bool ImportDirectory<bitsize>::HasModuleImport(std::string_view module, std::str
 				}
 
 				IMAGE_IMPORT_BY_NAME* _imp =
-					buffer->as<decltype(_imp)>(m_image->GetPEHeader().RvaToOffset(firstThunk->u1.AddressOfData));
+					buffer->as<decltype(_imp)>(m_image->getPEHdr().rvaToOffset(firstThunk->u1.AddressOfData));
 
 				if (import == _imp->Name)
 				{
 					if (rva)
-						*rva = descriptor->FirstThunk + (index * m_image->GetWordSize());
+						*rva = descriptor->FirstThunk + (index * m_image->getWordSize());
 
 					return true;
 				}
@@ -87,7 +87,7 @@ bool ImportDirectory<bitsize>::HasModuleImport(std::string_view module, std::str
 }
 
 template<unsigned int bitsize>
-void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva)
+void ImportDirectory<bitsize>::addModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva)
 {
 	// TODO: Clean this up and optimize some things.
 
@@ -97,9 +97,9 @@ void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::str
 	std::unique_ptr<std::uint8_t> descriptors;
 	std::uint32_t vsize = 0, rawsize = 0;
 
-	vsize = m_image->GetPEHeader()
-		.GetOptionalHeader()
-		.GetDataDirectory(DIRECTORY_ENTRY_IMPORT).Size;
+	vsize = m_image->getPEHdr()
+		.getOptionalHdr()
+		.getDataDir(DIRECTORY_ENTRY_IMPORT).Size;
 
 
 	descriptors.reset(new uint8_t[vsize]);
@@ -125,7 +125,7 @@ void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::str
 
 	//
 	// Create a new section for the descriptors
-	if (newSec = m_image->GetSectionHeader(".pepp"); newSec.GetName() == ".dummy")
+	if (newSec = m_image->getSectionHdr(".pepp"); newSec.getName() == ".dummy")
 	{
 		//
 		// We split a new section into two portions
@@ -133,7 +133,7 @@ void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::str
 		// The second part contains import descriptors
 		// NOTE: The section size may need to be modified depending on how many imports need to be added
 		// This is using quite a large section due to a IAT rebuilding tool I created previously.
-		m_image->AppendSection(
+		m_image->appendSection(
 			".pepp",
 			20 * PAGE_SIZE,
 			SCN_MEM_READ |
@@ -141,39 +141,39 @@ void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::str
 			SCN_CNT_INITIALIZED_DATA |
 			SCN_MEM_EXECUTE, &newSec);
 
-		memset(buffer->as<void*>(newSec.GetPointerToRawData()), 0xcc, newSec.GetSizeOfRawData());
+		memset(buffer->as<void*>(newSec.getPtrToRawData()), 0xcc, newSec.getSizeOfRawData());
 
-		newSec.SetPointerToRelocations(0);
-		newSec.SetPointerToLinenumbers(0);
-		newSec.SetNumberOfRelocations(0);
-		newSec.SetNumberOfLinenumbers(0);
+		newSec.setPtrToRelocations(0);
+		newSec.setPtrToLinenumbers(0);
+		newSec.setNumberOfRelocations(0);
+		newSec.setNumberOfLinenumbers(0);
 
 		// Ghetto, needed for now.
-		memcpy(&m_image->GetSectionHeader(".pepp"), &newSec, sizeof newSec);
+		memcpy(&m_image->getSectionHdr(".pepp"), &newSec, sizeof newSec);
 
 		//
 		// Set the new base.
 		m_base = reinterpret_cast<decltype(m_base)>(
-			&m_image->base()[m_image->GetPEHeader().RvaToOffset(
-				newSec.GetVirtualAddress() + (10*PAGE_SIZE))]);
+			&m_image->base()[m_image->getPEHdr().rvaToOffset(
+				newSec.getVirtualAddress() + (10*PAGE_SIZE))]);
 	}
 
 	//
 	// Fill in the original descriptors
-	std::memcpy(&buffer->at(newSec.GetPointerToRawData() + (10*PAGE_SIZE)), descriptors.get(), vsize);
+	std::memcpy(&buffer->at(newSec.getPtrToRawData() + (10*PAGE_SIZE)), descriptors.get(), vsize);
 
 	//
 	// Set the new directory
-	m_image->GetPEHeader()
-		.GetOptionalHeader()
-		.GetDataDirectory(DIRECTORY_ENTRY_IMPORT).VirtualAddress
-		= newSec.GetVirtualAddress() + (10*PAGE_SIZE);
-	m_image->GetPEHeader()
-		.GetOptionalHeader()
-		.GetDataDirectory(DIRECTORY_ENTRY_IMPORT).Size
+	m_image->getPEHdr()
+		.getOptionalHdr()
+		.getDataDir(DIRECTORY_ENTRY_IMPORT).VirtualAddress
+		= newSec.getVirtualAddress() + (10*PAGE_SIZE);
+	m_image->getPEHdr()
+		.getOptionalHdr()
+		.getDataDir(DIRECTORY_ENTRY_IMPORT).Size
 		= vsize + sizeof detail::Image_t<>::ImportDescriptor_t;
 
-	std::uint32_t descriptor_offset = newSec.GetPointerToRawData() + (10*PAGE_SIZE) + vsize - sizeof(*descriptor);
+	std::uint32_t descriptor_offset = newSec.getPtrToRawData() + (10*PAGE_SIZE) + vsize - sizeof(*descriptor);
 	descriptor = (decltype(descriptor)) & ((*buffer)[descriptor_offset]);
 
 	//
@@ -190,13 +190,13 @@ void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::str
 	std::uint32_t oft_offset = 0;
 	std::uint32_t oft_rva = 0;
 
-	if (!ImportsModule(module, &name_rva))
+	if (!importsModule(module, &name_rva))
 	{
 		// 2) If 1 isn't possible, add a section or extend the data section (hard)
 		// and add in the module name manually
 		// 	   - set descriptor->Name to that rva
-		tmp_offset = m_image->FindPadding(&newSec, 0xcc, module.size() + 1);
-		name_rva = m_image->GetPEHeader().OffsetToRva(tmp_offset);
+		tmp_offset = m_image->findPadding(&newSec, 0xcc, module.size() + 1);
+		name_rva = m_image->getPEHdr().offsetToRva(tmp_offset);
 
 		std::memcpy(buffer->as<char*>(tmp_offset), module.data(), module.size());
 		buffer->as<char*>(tmp_offset)[module.size()] = 0;
@@ -209,9 +209,9 @@ void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::str
 	ImageThunkData_t thunks[2];
 
 	// 3) Add in FirstThunk
-	tmp_offset = m_image->FindPadding(&newSec, 0xcc, sizeof(thunks), m_image->GetWordSize());
+	tmp_offset = m_image->findPadding(&newSec, 0xcc, sizeof(thunks), m_image->getWordSize());
 
-	iat_rva = m_image->GetPEHeader().OffsetToRva(tmp_offset);
+	iat_rva = m_image->getPEHdr().offsetToRva(tmp_offset);
 
 	//
 	// Fill in values so that it doesn't get taken up next time this function is called
@@ -226,17 +226,17 @@ void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::str
 		*rva = iat_rva;
 
 	// 4) Add in OriginalFirstThunk
-	tmp_offset = m_image->FindPadding(&newSec, 0xcc, sizeof(thunks), m_image->GetWordSize());
+	tmp_offset = m_image->findPadding(&newSec, 0xcc, sizeof(thunks), m_image->getWordSize());
 	
-	tmp_rva = m_image->GetPEHeader().OffsetToRva(tmp_offset);
+	tmp_rva = m_image->getPEHdr().offsetToRva(tmp_offset);
 
 	//
 	// Fill in values so that it doesn't get taken up next time this function is called
 	// Also, these need to be zero.
 	memset(buffer->as<void*>(tmp_offset), 0x00, sizeof(thunks));
 
-	oft_offset = m_image->FindPadding(&newSec, 0xcc, sizeof(std::uint16_t) + import.size() + 1, m_image->GetWordSize());
-	oft_rva = m_image->GetPEHeader().OffsetToRva(oft_offset);
+	oft_offset = m_image->findPadding(&newSec, 0xcc, sizeof(std::uint16_t) + import.size() + 1, m_image->getWordSize());
+	oft_rva = m_image->getPEHdr().offsetToRva(oft_offset);
 	//
 	// Copy in name to the oft rva
 	IMAGE_IMPORT_BY_NAME* imp = buffer->as<IMAGE_IMPORT_BY_NAME*>(oft_offset);
@@ -257,7 +257,7 @@ void ImportDirectory<bitsize>::AddModuleImport(std::string_view module, std::str
 }
 
 template<unsigned int bitsize>
-void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::initializer_list<std::string_view> imports, std::uint32_t* rva)
+void ImportDirectory<bitsize>::addModuleImports(std::string_view module, std::initializer_list<std::string_view> imports, std::uint32_t* rva)
 {
 	// TODO: Clean this up and optimize some things.
 
@@ -267,9 +267,9 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 	std::unique_ptr<std::uint8_t> descriptors;
 	std::uint32_t vsize = 0, rawsize = 0;
 
-	vsize = m_image->GetPEHeader()
-		.GetOptionalHeader()
-		.GetDataDirectory(DIRECTORY_ENTRY_IMPORT).Size;
+	vsize = m_image->getPEHdr()
+		.getOptionalHdr()
+		.getDataDir(DIRECTORY_ENTRY_IMPORT).Size;
 
 
 	descriptors.reset(new uint8_t[vsize]);
@@ -295,13 +295,13 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 
 	//
 	// Create a new section for the descriptors
-	if (newSec = m_image->GetSectionHeader(".pepp"); newSec.GetName() == ".dummy")
+	if (newSec = m_image->getSectionHdr(".pepp"); newSec.getName() == ".dummy")
 	{
 		//
 		// We split a new section into two portions
 		// The first part contains IAT addresses, or IMAGE_IMPORT_BY_NAME structs.
 		// The second part contains import descriptors
-		m_image->AppendSection(
+		m_image->appendSection(
 			".pepp",
 			2 * PAGE_SIZE,
 			SCN_MEM_READ |
@@ -309,39 +309,39 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 			SCN_CNT_INITIALIZED_DATA |
 			SCN_MEM_EXECUTE, &newSec);
 
-		memset(buffer->as<void*>(newSec.GetPointerToRawData()), 0xcc, newSec.GetSizeOfRawData());
+		memset(buffer->as<void*>(newSec.getPtrToRawData()), 0xcc, newSec.getSizeOfRawData());
 
-		newSec.SetPointerToRelocations(0);
-		newSec.SetPointerToLinenumbers(0);
-		newSec.SetNumberOfRelocations(0);
-		newSec.SetNumberOfLinenumbers(0);
+		newSec.setPtrToRelocations(0);
+		newSec.setPtrToLinenumbers(0);
+		newSec.setNumberOfRelocations(0);
+		newSec.setNumberOfLinenumbers(0);
 
 		// Ghetto, needed for now.
-		memcpy(&m_image->GetSectionHeader(".pepp"), &newSec, sizeof newSec);
+		memcpy(&m_image->getSectionHdr(".pepp"), &newSec, sizeof newSec);
 
 		//
 		// Set the new base.
 		m_base = reinterpret_cast<decltype(m_base)>(
-			&m_image->base()[m_image->GetPEHeader().RvaToOffset(
-				newSec.GetVirtualAddress() + PAGE_SIZE)]);
+			&m_image->base()[m_image->getPEHdr().rvaToOffset(
+				newSec.getVirtualAddress() + PAGE_SIZE)]);
 	}
 
 	//
 	// Fill in the original descriptors
-	std::memcpy(&buffer->at(newSec.GetPointerToRawData() + PAGE_SIZE), descriptors.get(), vsize);
+	std::memcpy(&buffer->at(newSec.getPtrToRawData() + PAGE_SIZE), descriptors.get(), vsize);
 
 	//
 	// Set the new directory
-	m_image->GetPEHeader()
-		.GetOptionalHeader()
-		.GetDataDirectory(DIRECTORY_ENTRY_IMPORT).VirtualAddress
-		= newSec.GetVirtualAddress() + PAGE_SIZE;
-	m_image->GetPEHeader()
-		.GetOptionalHeader()
-		.GetDataDirectory(DIRECTORY_ENTRY_IMPORT).Size
+	m_image->getPEHdr()
+		.getOptionalHdr()
+		.getDataDir(DIRECTORY_ENTRY_IMPORT).VirtualAddress
+		= newSec.getVirtualAddress() + PAGE_SIZE;
+	m_image->getPEHdr()
+		.getOptionalHdr()
+		.getDataDir(DIRECTORY_ENTRY_IMPORT).Size
 		= vsize + sizeof detail::Image_t<>::ImportDescriptor_t;
 
-	std::uint32_t descriptor_offset = newSec.GetPointerToRawData() + PAGE_SIZE + vsize - sizeof(*descriptor);
+	std::uint32_t descriptor_offset = newSec.getPtrToRawData() + PAGE_SIZE + vsize - sizeof(*descriptor);
 	descriptor = (decltype(descriptor)) & ((*buffer)[descriptor_offset]);
 
 	//
@@ -358,13 +358,13 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 	std::uint32_t oft_offset = 0;
 	std::uint32_t oft_rva = 0;
 
-	if (!ImportsModule(module, &name_rva))
+	if (!importsModule(module, &name_rva))
 	{
 		// 2) If 1 isn't possible, add a section or extend the data section (hard)
 		// and add in the module name manually
 		// 	   - set descriptor->Name to that rva
-		tmp_offset = m_image->FindPadding(&newSec, 0xcc, module.size() + 1);
-		name_rva = m_image->GetPEHeader().OffsetToRva(tmp_offset);
+		tmp_offset = m_image->findPadding(&newSec, 0xcc, module.size() + 1);
+		name_rva = m_image->getPEHdr().offsetToRva(tmp_offset);
 
 		std::memcpy(buffer->as<char*>(tmp_offset), module.data(), module.size());
 		buffer->as<char*>(tmp_offset)[module.size()] = 0;
@@ -379,8 +379,8 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 
 
 	// 3) Add in FirstThunk
-	tmp_offset = m_image->FindPadding(&newSec, 0xcc, thunksize, m_image->GetWordSize());
-	iat_rva = m_image->GetPEHeader().OffsetToRva(tmp_offset);
+	tmp_offset = m_image->findPadding(&newSec, 0xcc, thunksize, m_image->getWordSize());
+	iat_rva = m_image->getPEHdr().offsetToRva(tmp_offset);
 
 	//
 	// Fill in values so that it doesn't get taken up next time this function is called
@@ -395,8 +395,8 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 
 
 	// 4) Add in OriginalFirstThunk
-	tmp_offset = m_image->FindPadding(&newSec, 0xcc, thunksize, m_image->GetWordSize());
-	tmp_rva = m_image->GetPEHeader().OffsetToRva(tmp_offset);
+	tmp_offset = m_image->findPadding(&newSec, 0xcc, thunksize, m_image->getWordSize());
+	tmp_rva = m_image->getPEHdr().offsetToRva(tmp_offset);
 
 	//
 	// Fill in values so that it doesn't get taken up next time this function is called
@@ -409,8 +409,8 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 	int i = 0;
 	for (auto it = imports.begin(); it != imports.end(); it++)
 	{
-		oft_offset = m_image->FindPadding(&newSec, 0xcc, sizeof(std::uint16_t) + it->size() + 1, m_image->GetWordSize());
-		oft_rva = m_image->GetPEHeader().OffsetToRva(oft_offset);
+		oft_offset = m_image->findPadding(&newSec, 0xcc, sizeof(std::uint16_t) + it->size() + 1, m_image->getWordSize());
+		oft_rva = m_image->getPEHdr().offsetToRva(oft_offset);
 		//
 		// Copy in name to the oft rva
 		IMAGE_IMPORT_BY_NAME* imp = buffer->as<IMAGE_IMPORT_BY_NAME*>(oft_offset);
@@ -420,7 +420,7 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 		imp->Name[it->size()] = '\0';
 
 		if (rva)
-			rva[i] = iat_rva + (m_image->GetWordSize() * i++);
+			rva[i] = iat_rva + (m_image->getWordSize() * i++);
 
 		ogFirstThunk->u1.AddressOfData = oft_rva;
 		ogFirstThunk++;
@@ -436,17 +436,17 @@ void ImportDirectory<bitsize>::AddModuleImports(std::string_view module, std::in
 }
 
 template<unsigned int bitsize>
-void ImportDirectory<bitsize>::TraverseImports(const std::function<void(ModuleImportData_t*)>& cb_func)
+void ImportDirectory<bitsize>::traverseImports(const std::function<void(ModuleImportData_t*)>& cb_func)
 {
 	auto descriptor = m_base;
 	mem::ByteVector const* buffer = &m_image->buffer();
 
 	while (descriptor->Characteristics != 0) {
-		std::uint32_t offset = m_image->GetPEHeader().RvaToOffset(descriptor->Name);
+		std::uint32_t offset = m_image->getPEHdr().rvaToOffset(descriptor->Name);
 		const char* module = buffer->as<const char*>(offset);
 		std::int32_t index = 0;
 		typename detail::Image_t<bitsize>::ThunkData_t* firstThunk =
-			buffer->as<decltype(firstThunk)>(m_image->GetPEHeader().RvaToOffset(descriptor->OriginalFirstThunk));
+			buffer->as<decltype(firstThunk)>(m_image->getPEHdr().rvaToOffset(descriptor->OriginalFirstThunk));
 
 		ModuleImportData_t data{};
 		data.module_name_rva = descriptor->Name;
@@ -456,7 +456,7 @@ void ImportDirectory<bitsize>::TraverseImports(const std::function<void(ModuleIm
 		while (firstThunk->u1.AddressOfData)
 		{
 			IMAGE_IMPORT_BY_NAME* _imp =
-				buffer->as<decltype(_imp)>(m_image->GetPEHeader().RvaToOffset(firstThunk->u1.AddressOfData));
+				buffer->as<decltype(_imp)>(m_image->getPEHdr().rvaToOffset(firstThunk->u1.AddressOfData));
 
 			if (IsImportOrdinal(firstThunk->u1.Ordinal))
 			{
@@ -470,7 +470,7 @@ void ImportDirectory<bitsize>::TraverseImports(const std::function<void(ModuleIm
 				data.import_name_rva = firstThunk->u1.AddressOfData + sizeof(std::uint16_t);
 			}
 
-			data.import_rva = descriptor->FirstThunk + (index * m_image->GetWordSize());
+			data.import_rva = descriptor->FirstThunk + (index * m_image->getWordSize());
 
 			//
 			// Call the callback
@@ -485,17 +485,33 @@ void ImportDirectory<bitsize>::TraverseImports(const std::function<void(ModuleIm
 }
 
 template<unsigned int bitsize>
-void ImportDirectory<bitsize>::GetIATOffsets(std::uint32_t& begin, std::uint32_t& end) noexcept
+void ImportDirectory<bitsize>::getIATOffsets(std::uint32_t& begin, std::uint32_t& end) noexcept
 {
 	//
 	// Null out.
 	begin = end = 0;
 
-	IMAGE_DATA_DIRECTORY const& iat = m_image->GetPEHeader().GetOptionalHeader().GetDataDirectory(IMAGE_DIRECTORY_ENTRY_IAT);
+	IMAGE_DATA_DIRECTORY const& iat = m_image->getPEHdr().getOptionalHdr().getDataDir(IMAGE_DIRECTORY_ENTRY_IAT);
 	if (iat.Size == 0)
 		return;
 
 
-	begin = m_image->GetPEHeader().RvaToOffset(iat.VirtualAddress);
+	begin = m_image->getPEHdr().rvaToOffset(iat.VirtualAddress);
+	end = begin + iat.Size;
+}
+
+template<unsigned int bitsize>
+void pepp::ImportDirectory<bitsize>::getIATRvas(std::uint32_t begin, std::uint32_t& end) noexcept
+{
+	//
+	// Null out.
+	begin = end = 0;
+
+	IMAGE_DATA_DIRECTORY const& iat = m_image->getPEHdr().getOptionalHdr().getDataDir(IMAGE_DIRECTORY_ENTRY_IAT);
+	if (iat.Size == 0)
+		return;
+
+
+	begin = iat.VirtualAddress;
 	end = begin + iat.Size;
 }

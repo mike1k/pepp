@@ -31,48 +31,49 @@ namespace pepp
 	public:
 		ImportDirectory() = default;
 
-		bool ImportsModule(std::string_view module, std::uint32_t* name_rva = nullptr) const;
-		bool HasModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva = nullptr) const;
-		void AddModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva = nullptr);
-		void AddModuleImports(std::string_view module, std::initializer_list<std::string_view> imports, std::uint32_t* rva = nullptr);
-		void TraverseImports(const std::function<void(ModuleImportData_t*)>& cb_func);
+		bool importsModule(std::string_view module, std::uint32_t* name_rva = nullptr) const;
+		bool hasModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva = nullptr) const;
+		void addModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva = nullptr);
+		void addModuleImports(std::string_view module, std::initializer_list<std::string_view> imports, std::uint32_t* rva = nullptr);
+		void traverseImports(const std::function<void(ModuleImportData_t*)>& cb_func);
 
-		void SetCharacteristics(std::uint32_t chrs) {
+		void setCharacteristics(std::uint32_t chrs) {
 			m_base->Characteristics = chrs;
 		}
 
-		std::uint32_t GetCharacteristics() const {
+		std::uint32_t getCharacteristics() const {
 			return m_base->Characteristics;
 		}
 		
-		void SetTimeDateStamp(std::uint32_t TimeDateStamp) {
+		void setTimeDateStamp(std::uint32_t TimeDateStamp) {
 			m_base->TimeDateStamp = TimeDateStamp;
 		}
 
-		std::uint32_t GetTimeDateStamp() const {
+		std::uint32_t getTimeDateStamp() const {
 			return m_base->TimeDateStamp;
 		}
 
 		//! Util
 		template<typename T>
-		bool IsImportOrdinal(T ord) const requires pepp::msc::MemoryAddress<T> {
+		bool isImportOrdinal(T ord) const requires pepp::msc::MemoryAddress<T> {
 			if constexpr (bitsize == 64)
 				return (ord & IMPORT_ORDINAL_FLAG_64) != 0;
 			return (ord & IMPORT_ORDINAL_FLAG_32) != 0;
 		}
 
-		void GetIATOffsets(std::uint32_t& begin, std::uint32_t& end) noexcept;
+		void getIATOffsets(std::uint32_t& begin, std::uint32_t& end) noexcept;
+		void getIATRvas(std::uint32_t begin, std::uint32_t& end) noexcept;
 
 	private:
 		//! Setup the directory
 		void _setup(Image<bitsize>* image) {
 			m_image = image;
 			m_base = reinterpret_cast<decltype(m_base)>(
-				&image->base()[image->GetPEHeader().RvaToOffset(
-					image->GetPEHeader().GetOptionalHeader().GetDataDirectory(DIRECTORY_ENTRY_IMPORT).VirtualAddress)]);		
+				&image->base()[image->getPEHdr().rvaToOffset(
+					image->getPEHdr().getOptionalHdr().getDataDir(DIRECTORY_ENTRY_IMPORT).VirtualAddress)]);		
 			m_iat_base = reinterpret_cast<decltype(m_iat_base)>(
-				&image->base()[image->GetPEHeader().RvaToOffset(
-					image->GetPEHeader().GetOptionalHeader().GetDataDirectory(DIRECTORY_ENTRY_IAT).VirtualAddress)]);
+				&image->base()[image->getPEHdr().rvaToOffset(
+					image->getPEHdr().getOptionalHdr().getDataDir(DIRECTORY_ENTRY_IAT).VirtualAddress)]);
 		}
 	};
 }

@@ -21,7 +21,7 @@ namespace pepp::io {
 
 	void File::Write(std::string_view text)
 	{
-		m_out_file.open(m_filename, m_flags & ~FILE_INPUT);
+		m_out_file.open(m_filename, m_flags & ~kFileInput);
 		if (m_out_file.is_open()) {
 			m_out_file << text;
 			m_out_file.close();
@@ -30,18 +30,33 @@ namespace pepp::io {
 
 	void File::Write(const std::vector<std::uint8_t>& data)
 	{
-		m_out_file.open(m_filename, m_flags & ~FILE_INPUT);
+		m_out_file.open(m_filename, m_flags & ~kFileInput);
 		if (m_out_file.is_open()) {
 			m_out_file.write((const char*)data.data(), data.size());
 			m_out_file.close();
 		}
 	}
 
+	void File::Write(void* data, size_t size)
+	{
+		m_out_file.open(m_filename, m_flags & ~kFileInput);
+		if (m_out_file.is_open())
+		{
+			m_out_file.write((const char*)data, size);
+			m_out_file.close();
+		}
+	}
+
+	bool File::Exists()
+	{
+		return std::filesystem::exists(m_filename);
+	}
+
 	std::vector<std::uint8_t> File::Read()
 	{
 		std::vector<std::uint8_t> file_buffer;
 
-		m_in_file.open(m_filename, m_flags & ~FILE_OUTPUT);
+		m_in_file.open(m_filename, m_flags & ~kFileOutput);
 
 		if (m_in_file.is_open()) {
 			file_buffer = std::vector<std::uint8_t>(std::istreambuf_iterator<char>(m_in_file), {});

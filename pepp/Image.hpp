@@ -53,8 +53,8 @@ namespace pepp
 	}
 
 	/// 
-	//! class Image
-	//! Used for runtime or static analysis/manipulating of PE files.
+	// - class Image
+	// - Used for runtime or static analysis/manipulating of PE files.
 	/// 
 	template<unsigned int bitsize = 32>
 	class Image : pepp::msc::NonCopyable
@@ -65,7 +65,7 @@ namespace pepp
 
 	public:
 
-		//! Publicize the detail::Image_t used by this image.
+		// - Publicize the detail::Image_t used by this image.
 		using ImageData_t = detail::Image_t<bitsize>;
 
 		friend class PEHeader<bitsize>;
@@ -76,36 +76,38 @@ namespace pepp
 		std::string								m_fileName{};
 		mem::ByteVector							m_imageBuffer{};
 		PEHeader<bitsize>						m_PEHeader;
-		//! Sections
+		// - Sections
 		SectionHeader*							m_rawSectionHeaders;
-		//! Exports
+		// - Exports
 		ExportDirectory<bitsize>				m_exportDirectory;
-		//! Imports
+		// - Imports
 		ImportDirectory<bitsize>				m_importDirectory;
-		//! Relocations
+		// - Relocations
 		RelocationDirectory<bitsize>			m_relocDirectory;
-		//! Is image mapped? Rva2Offset becomes obsolete
-		bool									m_mem_mapped = false;
+		// - Is image mapped? Rva2Offset becomes obsolete
+		bool									m_isMemMapped = false;
+		// - Is image successfully parsed?
+		bool									m_isParsed;
 	public:
 
-		//! Default ctor.
+		// - Default ctor.
 		Image();
 
-		//! Used to construct a `class Image` via a existing file
+		// - Used to construct a `class Image` via a existing file
 		Image(std::string_view filepath);
 		
-		//! Used to construct a `class Image` via a memory buffer
+		// - Used to construct a `class Image` via a memory buffer
 		Image(const void* data, std::size_t size);
 
-		//! Used to construct via another `class Image`
+		// - Used to construct via another `class Image`
 		Image(const Image& image);
 
-		//! 
-		[[nodiscard]] static Image FromRuntimeMemory(void* data, std::size_t size) noexcept;
-		//! 
-		bool SetFromRuntimeMemory(void* data, std::size_t size) noexcept;
+		// - Initialization routines
+		void setFromMemory(const void* data, std::size_t size);
+		bool setFromMappedMemory(void* data, std::size_t size) noexcept;
+		bool setFromFilePath(std::string_view file_path);
 
-		//! Get the start pointer of the buffer.
+		// - Get the start pointer of the buffer.
 		std::uint8_t* base() {
 			return m_imageBuffer.data();
 		}
@@ -118,112 +120,128 @@ namespace pepp
 			return m_imageBuffer;
 		}
 
-		//! Magic number in the DOS header.
+		// - Magic number in the DOS header.
 		std::uint16_t magic() const {
 			return m_MZHeader->e_magic;
 		}
 
-		//! PEHeader wrapper
-		class PEHeader<bitsize>& GetPEHeader() {
+		// - Get the Image Base
+		detail::Image_t<bitsize>::Address_t getImageBase() const noexcept {
+			return m_PEHeader.getOptionalHdr().getImageBase();
+		}
+
+		// - PEHeader wrapper
+		class PEHeader<bitsize>& getPEHdr() {
 			return m_PEHeader;
 		}
 
-		class ExportDirectory<bitsize>& GetExportDirectory() {
+		class ExportDirectory<bitsize>& getExportDir() {
 			return m_exportDirectory;
 		}
 
-		class ImportDirectory<bitsize>& GetImportDirectory() {
+		class ImportDirectory<bitsize>& getImportDir() {
 			return m_importDirectory;
 		}
 
-		class RelocationDirectory<bitsize>& GetRelocationDirectory() {
+		class RelocationDirectory<bitsize>& getRelocDir() {
 			return m_relocDirectory;
 		}
 
-		const PEHeader<bitsize>& GetPEHeader() const {
+		const PEHeader<bitsize>& getPEHdr() const {
 			return m_PEHeader;
 		}
 
-		const class ExportDirectory<bitsize>& GetExportDirectory() const {
+		const class ExportDirectory<bitsize>& getExportDir() const {
 			return m_exportDirectory;
 		}
 
-		const class ImportDirectory<bitsize>& GetImportDirectory() const {
+		const class ImportDirectory<bitsize>& getImportDir() const {
 			return m_importDirectory;
 		}
 
-		const class RelocationDirectory<bitsize>& GetRelocationDirectory() const {
+		const class RelocationDirectory<bitsize>& getRelocDir() const {
 			return m_relocDirectory;
 		}
 
-		//! Native pointer
+		// - Native pointer
 		detail::Image_t<>::MZHeader_t* native() {
 			return m_MZHeader;
 		}
 
-		//! Write out changes to a new functional image.
-		[[nodiscard]] Image<bitsize> Compile();
+		// - Assign all sections to the appropriate VA
+		void setAsMapped() noexcept;
 
-		//!
-		void SetMapped() noexcept;
+		void mapToBuffer(pepp::Address<> base, const std::vector<std::string>& ignore = {});
 
+		// - Get PEMachine
+		constexpr PEMachine getMachine() const;
 
-		//! Get PEMachine
-		constexpr PEMachine GetMachine() const;
+		// - Is X64
+		static constexpr unsigned int getBitSize() { return bitsize; }
 
-		//! Is X64
-		static constexpr unsigned int GetBitSize() { return bitsize; }
+		// - Add a new section to the image
+		bool appendSection(std::string_view sectionName, std::uint32_t size, std::uint32_t chars, SectionHeader* out = nullptr);
 
-		//! Add a new section to the image
-		bool AppendSection(std::string_view sectionName, std::uint32_t size, std::uint32_t chars, SectionHeader* out = nullptr);
+		// - Extend an existing section (will break things depending on the section)
+		bool extendSection(std::string_view sectionName, std::uint32_t delta);
 
-		//! Extend an existing section (will break things depending on the section)
-		bool ExtendSection(std::string_view sectionName, std::uint32_t delta);
+		// - Append a new export
+		bool appendExport(std::string_view exportName, std::uint32_t rva);
 
-		//! Append a new export
-		bool AppendExport(std::string_view exportName, std::uint32_t rva);
+		void scrambleVaData(uint32_t va, uint32_t size);
 
-		//! Find offset padding of value v with count n, starting at specified header or bottom of image if none specified
-		std::uint32_t FindPadding(SectionHeader* s, std::uint8_t v, std::size_t n, std::uint32_t alignment = 0);
+		bool isDll() const;
+		bool isSystemFile() const;
+		bool isDllOrSystemFile() const;
 
-		//! Find offset zero padding up to N bytes, starting at specified header or bottom of image if none specified
-		std::uint32_t FindZeroPadding(SectionHeader* s, std::size_t n, std::uint32_t alignment = 0);
+		// - 
+		void relocateImage(uintptr_t imageBase);
 
-		//! Find (wildcard acceptable) binary sequence
-		std::vector<std::uint32_t> FindBinarySequence(SectionHeader* s, std::string_view binary_seq) const;
-		std::vector<std::pair<std::int32_t, std::uint32_t>> FindBinarySequences(SectionHeader* s, std::initializer_list<std::pair<std::int32_t, std::string_view>> binary_seq) const;
+		// - Find offset padding of value v with count n, starting at specified header or bottom of image if none specified
+		std::uint32_t findPadding(SectionHeader* s, std::uint8_t v, std::size_t n, std::uint32_t alignment = 0);
 
-		//! Check if a data directory is "present"
-		//! - Necessary before actually using the directory
-		//!  (e.g not all images will have a valid IMAGE_EXPORT_DIRECTORY)
-		bool HasDataDirectory(PEDirectoryEntry entry);
+		// - Find offset zero padding up to N bytes, starting at specified header or bottom of image if none specified
+		std::uint32_t findZeroPadding(SectionHeader* s, std::size_t n, std::uint32_t alignment = 0);
 
-		//! Write out to file
-		void WriteToFile(std::string_view filepath);
+		// - Find (wildcard acceptable) binary sequence
+		std::vector<std::uint32_t> findBinarySequence(SectionHeader* s, std::string_view binary_seq) const;
+		std::vector<std::pair<std::int32_t, std::uint32_t>> findBinarySequences(SectionHeader* s, std::initializer_list<std::pair<std::int32_t, std::string_view>> binary_seq) const;
 
-		//! Wrappers
-		SectionHeader& GetSectionHeader(std::uint16_t dwIndex) {
-			return m_PEHeader.GetSectionHeader(dwIndex);
+		// - Check if a data directory is "present"
+		// - - Necessary before actually using the directory
+		// -  (e.g not all images will have a valid IMAGE_EXPORT_DIRECTORY)
+		bool hasDataDirectory(PEDirectoryEntry entry);
+
+		// - Write out to file
+		void writeToFile(std::string_view filepath);
+
+		// - Wrappers
+		SectionHeader& getSectionHdr(std::uint16_t dwIndex) {
+			return m_PEHeader.getSectionHeader(dwIndex);
 		}
-		SectionHeader& GetSectionHeader(std::string_view name) {
-			return m_PEHeader.GetSectionHeader(name);
+		SectionHeader& getSectionHdr(std::string_view name) {
+			return m_PEHeader.getSectionHeader(name);
 		}
-		SectionHeader& GetSectionHeaderFromVa(std::uint32_t va) {
-			return m_PEHeader.GetSectionHeaderFromVa(va);
+		SectionHeader& getSectionHdrFromVa(std::uint32_t va) {
+			return m_PEHeader.getSectionHeaderFromVa(va);
 		} 
-		SectionHeader& GetSectionHeaderFromOffset(std::uint32_t offset) {
-			return m_PEHeader.GetSectionHeaderFromOffset(offset);
+		SectionHeader& getSectionHdrFromOffset(std::uint32_t offset) {
+			return m_PEHeader.getSectionHeaderFromOffset(offset);
 		}
-		std::uint16_t GetNumberOfSections() const {
-			return m_PEHeader.GetFileHeader().GetNumberOfSections();
+		std::uint16_t getNumberOfSections() const {
+			return m_PEHeader.getFileHdr().getNumberOfSections();
 		}
 
-		constexpr auto GetWordSize() const {
+		constexpr auto getWordSize() const {
 			return bitsize == 64 ? sizeof(std::uint64_t) : sizeof(std::uint32_t);
 		}
 
+		bool wasParsed() const {
+			return m_isParsed;
+		}
+
 	private:
-		//! Setup internal objects/pointers and validate they are proper.
+		// - Setup internal objects/pointers and validate they are proper.
 		void _validate();
 	};
 

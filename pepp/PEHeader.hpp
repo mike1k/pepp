@@ -19,7 +19,7 @@ namespace pepp
 
 		using ImageData_t = detail::Image_t<bitsize>;
 
-		Image<bitsize>*					m_Image;
+		Image<bitsize>*					m_image;
 		ImageData_t::Header_t*			m_PEHdr = nullptr;
 		FileHeader						m_FileHeader;
 		OptionalHeader<bitsize>			m_OptionalHeader;
@@ -28,64 +28,64 @@ namespace pepp
 		PEHeader();
 	public:
 
-		class FileHeader& GetFileHeader() {
+		class FileHeader& getFileHdr() {
 			return m_FileHeader;
 		}
 
-		const class FileHeader& GetFileHeader() const {
+		const class FileHeader& getFileHdr() const {
 			return m_FileHeader;
 		}
 
-		class OptionalHeader<bitsize>& GetOptionalHeader() {
+		class OptionalHeader<bitsize>& getOptionalHdr() {
 			return m_OptionalHeader;
 		}
 
-		const class OptionalHeader<bitsize>& GetOptionalHeader() const {
+		const class OptionalHeader<bitsize>& getOptionalHdr() const {
 			return m_OptionalHeader;
 		}
 
-		SectionHeader& GetSectionHeader(std::uint16_t dwIndex) {
+		SectionHeader& getSectionHeader(std::uint16_t dwIndex) {
 			static SectionHeader dummy{};
 
-			if (dwIndex < m_Image->GetNumberOfSections())
-				return m_Image->m_rawSectionHeaders[dwIndex];
+			if (dwIndex < m_image->getNumberOfSections())
+				return m_image->m_rawSectionHeaders[dwIndex];
 			
 			return dummy;
 		}
 
-		SectionHeader& GetSectionHeader(std::string_view name) {
+		SectionHeader& getSectionHeader(std::string_view name) {
 			static SectionHeader dummy{};
 
-			for (std::uint16_t n = 0; n < m_Image->GetNumberOfSections(); n++)
+			for (std::uint16_t n = 0; n < m_image->getNumberOfSections(); n++)
 			{
-				if (m_Image->m_rawSectionHeaders[n].GetName().compare(name) == 0) {
-					return m_Image->m_rawSectionHeaders[n];
+				if (m_image->m_rawSectionHeaders[n].getName().compare(name) == 0) {
+					return m_image->m_rawSectionHeaders[n];
 				}
 			}
 
 			return dummy;
 		}
 
-		SectionHeader& GetSectionHeaderFromVa(std::uint32_t va) {
+		SectionHeader& getSectionHeaderFromVa(std::uint32_t va) {
 			static SectionHeader dummy{}; 
 			
-			for (std::uint16_t n = 0; n < m_Image->GetNumberOfSections(); n++)
+			for (std::uint16_t n = 0; n < m_image->getNumberOfSections(); n++)
 			{
-				if (m_Image->m_rawSectionHeaders[n].HasVirtualAddress(va)) {
-					return m_Image->m_rawSectionHeaders[n];
+				if (m_image->m_rawSectionHeaders[n].hasVirtualAddress(va)) {
+					return m_image->m_rawSectionHeaders[n];
 				}
 			}
 
 			return dummy;
 		}
 
-		SectionHeader& GetSectionHeaderFromOffset(std::uint32_t offset) {
+		SectionHeader& getSectionHeaderFromOffset(std::uint32_t offset) {
 			static SectionHeader dummy{};
 
-			for (std::uint16_t n = 0; n < m_Image->GetNumberOfSections(); n++)
+			for (std::uint16_t n = 0; n < m_image->getNumberOfSections(); n++)
 			{
-				if (m_Image->m_rawSectionHeaders[n].HasOffset(offset)) {
-					return m_Image->m_rawSectionHeaders[n];
+				if (m_image->m_rawSectionHeaders[n].hasOffset(offset)) {
+					return m_image->m_rawSectionHeaders[n];
 				}
 			}
 
@@ -95,41 +95,41 @@ namespace pepp
 
 
 		//! Calculate the number of directories present (not NumberOfRvaAndSizes)
-		std::uint32_t DirectoryCount() const {
-			return GetOptionalHeader().DirectoryCount();
+		std::uint32_t getDirectoryCount() const {
+			return getOptionalHdr().getDirectoryCount();
 		}
 
 		//! Convert a relative virtual address to a file offset
-		std::uint32_t RvaToOffset(std::uint32_t rva) {
-			SectionHeader const& sec { GetSectionHeaderFromVa(rva) };
+		std::uint32_t rvaToOffset(std::uint32_t rva) {
+			SectionHeader const& sec { getSectionHeaderFromVa(rva) };
 			//
 			// Did we get one?
-			if (sec.GetName() != ".dummy") {
-				return sec.GetPointerToRawData() + rva - sec.GetVirtualAddress();
+			if (sec.getName() != ".dummy") {
+				return sec.getPtrToRawData() + rva - sec.getVirtualAddress();
 			}
 
 			return 0ul;
 		}
 
 		//! Convert a file offset back to a relative virtual address
-		std::uint32_t OffsetToRva(std::uint32_t offset) {
-			SectionHeader const& sec{ GetSectionHeaderFromOffset(offset) };
+		std::uint32_t offsetToRva(std::uint32_t offset) {
+			SectionHeader const& sec{ getSectionHeaderFromOffset(offset) };
 			//
 			// Did we get one?
-			if (sec.GetName() != ".dummy") {
-				return (sec.GetVirtualAddress() + offset) - sec.GetPointerToRawData();
+			if (sec.getName() != ".dummy") {
+				return (sec.getVirtualAddress() + offset) - sec.getPtrToRawData();
 			}
 
 			return 0ul;
 		}
 		 
 		//! Convert a rel. virtual address to a virtual address
-		detail::Image_t<bitsize>::Address_t RvaToVa(std::uint32_t rva) const {
-			return m_OptionalHeader.GetImageBase() + rva;
+		detail::Image_t<bitsize>::Address_t rvaToVa(std::uint32_t rva) const {
+			return m_OptionalHeader.getImageBase() + rva;
 		}
 
 		//! Used to check if the NT tag is present.
-		bool IsTaggedPE() const {
+		bool isTaggedPE() const {
 			return m_PEHdr->Signature == IMAGE_NT_SIGNATURE;
 		}
 
@@ -147,21 +147,21 @@ namespace pepp
 		}
 
 		//! Manually calculate the size of the image
-		std::uint32_t GetSizeOfImage();
+		std::uint32_t calcSizeOfImage();
 
 		//! Manually calculate the start of the code section
-		std::uint32_t GetStartOfCode();
+		std::uint32_t getStartOfCode();
 
 		//! Calculate next section offset
-		std::uint32_t GetNextSectionOffset();
+		std::uint32_t getNextSectionOffset();
 
 		//! Calculate next section rva
-		std::uint32_t GetNextSectionRva();
+		std::uint32_t getNextSectionRva();
 	private:
 		//! Setup the header
 		void _setup(Image<bitsize>* image) {
-			m_Image = image;
-			m_PEHdr = reinterpret_cast<decltype(m_PEHdr)>(m_Image->base() + m_Image->m_MZHeader->e_lfanew);
+			m_image = image;
+			m_PEHdr = reinterpret_cast<decltype(m_PEHdr)>(m_image->base() + m_image->m_MZHeader->e_lfanew);
 			m_FileHeader._setup(image);
 			m_OptionalHeader._setup(image);
 		}
