@@ -11,7 +11,7 @@ ExportData_t ExportDirectory<bitsize>::getExport(std::uint32_t idx, bool demangl
 	if (!isPresent())
 		return {};
 
-	if (idx < GetNumberOfNames()) {
+	if (idx < getNumberOfNames()) {
 		std::uint8_t* base{};
 		std::uint32_t funcAddresses{};
 		std::uint32_t funcNames{};
@@ -19,11 +19,11 @@ ExportData_t ExportDirectory<bitsize>::getExport(std::uint32_t idx, bool demangl
 		std::uint32_t funcNamesOffset{};
 		mem::ByteVector const* buffer{};
 
-		funcOrdinals = m_image->getPEHdr().rvaToOffset(GetAddressOfNameOrdinals());
+		funcOrdinals = m_image->getPEHdr().rvaToOffset(getAddressOfNameOrdinals());
 		uint16_t rlIdx = m_image->buffer().deref<uint16_t>(funcOrdinals + (idx * sizeof uint16_t));
 
-		funcAddresses = m_image->getPEHdr().rvaToOffset(GetAddressOfFunctions() + sizeof(std::uint32_t) * rlIdx);
-		funcNames = m_image->getPEHdr().rvaToOffset(GetAddressOfNames() + sizeof(std::uint32_t) * idx);
+		funcAddresses = m_image->getPEHdr().rvaToOffset(getAddressOfFunctions() + sizeof(std::uint32_t) * rlIdx);
+		funcNames = m_image->getPEHdr().rvaToOffset(getAddressOfNames() + sizeof(std::uint32_t) * idx);
 		funcNamesOffset = m_image->getPEHdr().rvaToOffset(m_image->buffer().deref<uint32_t>(funcNames));
 
 
@@ -45,9 +45,9 @@ ExportData_t ExportDirectory<bitsize>::getExport(std::uint32_t idx, bool demangl
 template<unsigned int bitsize>
 ExportData_t pepp::ExportDirectory<bitsize>::getExport(std::string_view name, bool demangle) const
 {
-	for (int i = 0; i < GetNumberOfNames(); i++)
+	for (int i = 0; i < getNumberOfNames(); i++)
 	{
-		ExportData_t data = GetExport(i, demangle);
+		ExportData_t data = getExport(i, demangle);
 		if (data.name == name)
 			return data;
 	}
@@ -58,9 +58,9 @@ ExportData_t pepp::ExportDirectory<bitsize>::getExport(std::string_view name, bo
 template<unsigned int bitsize>
 void ExportDirectory<bitsize>::traverseExports(const std::function<void(ExportData_t*)>& cb_func, bool demangle)
 {
-	for (int i = 0; i < GetNumberOfNames(); i++)
+	for (int i = 0; i < getNumberOfNames(); i++)
 	{
-		ExportData_t data = GetExport(i, demangle);
+		ExportData_t data = getExport(i, demangle);
 		if (data.rva != 0)
 			cb_func(&data);
 	}
