@@ -54,7 +54,7 @@ bool ImportDirectory<bitsize>::hasModuleImport(std::string_view module, std::str
 			{
 				//
 				// TODO: Ordinals not handled here.
-				if (IsImportOrdinal(firstThunk->u1.Ordinal))
+				if (isImportOrdinal(firstThunk->u1.Ordinal))
 				{
 					index++;
 					firstThunk++;
@@ -458,7 +458,7 @@ void ImportDirectory<bitsize>::traverseImports(const std::function<void(ModuleIm
 			IMAGE_IMPORT_BY_NAME* _imp =
 				buffer->as<decltype(_imp)>(m_image->getPEHdr().rvaToOffset(firstThunk->u1.AddressOfData));
 
-			if (IsImportOrdinal(firstThunk->u1.Ordinal))
+			if (isImportOrdinal(firstThunk->u1.Ordinal))
 			{
 				data.ordinal = true;
 				data.import_variant = (std::uint64_t)firstThunk->u1.Ordinal;
