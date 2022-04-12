@@ -145,5 +145,9 @@ namespace pepp::mem {
 		T deref(std::size_t idx = 0x0) const {
 			return *(T*)(&at(idx));
 		}
+		template<typename T>
+		T& deref(std::size_t idx = 0x0) {
+			return *(T*)(&at(idx));
+		}
 	};
 }

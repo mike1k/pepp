@@ -43,54 +43,58 @@ namespace pepp
 
 
 		//! Getter/setter for OptionalHeader.Magic
-		void SetMagic(PEMagic magic);
-		PEMagic GetMagic() const;
+		void setMagic(PEMagic magic);
+		PEMagic getMagic() const;
 
 		//! Getter/setter for OptionalHeader.ImageBase
-		void SetImageBase(detail::Image_t<bitsize>::Address_t address);
-		detail::Image_t<bitsize>::Address_t GetImageBase() const;
+		void setImageBase(detail::Image_t<bitsize>::Address_t address);
+		detail::Image_t<bitsize>::Address_t getImageBase() const;
 
 		//! Getter/setter for OptionalHeader.SizeOfImage
-		void SetSizeOfImage(std::uint32_t size);
-		std::uint32_t GetSizeOfImage() const;
+		void setSizeOfImage(std::uint32_t size);
+		std::uint32_t getSizeOfImage() const;
 
 		//! Getter/setter for OptionalHeader.SizeOfCode
-		void SetSizeOfCode(std::uint32_t dwSize);
-		std::uint32_t GetSizeOfCode() const;
+		void setSizeOfCode(std::uint32_t dwSize);
+		std::uint32_t getSizeOfCode() const;
 
 		//! Getter/setter for OptionalHeader.SizeOfInitializedData
-		void SetSizeOfInitializedData(std::uint32_t dwSize);
-		std::uint32_t GetSizeOfInitializedData() const;
+		void setSizeOfInitializedData(std::uint32_t dwSize);
+		std::uint32_t getSizeOfInitializedData() const;
+
+		//! Getter/setter for OptionalHeader.SizeOfInitializedData
+		void setSizeOfHeaders(std::uint32_t dwSize);
+		std::uint32_t getSizeOfHeaders() const;
 
 		//! Getter/setter for OptionalHeader.SizeOfUninitializedData
-		void SetSizeOfUninitializedData(std::uint32_t dwSize);
-		std::uint32_t GetSizeOfUninitializedData() const;
+		void setSizeOfUninitializedData(std::uint32_t dwSize);
+		std::uint32_t getSizeOfUninitializedData() const;
 
 		//! Getter/setter for OptionalHeader.BaseOfCode
-		void SetBaseOfCode(std::uint32_t dwBase);
-		std::uint32_t GetBaseOfCode() const;
+		void setBaseOfCode(std::uint32_t dwBase);
+		std::uint32_t getBaseOfCode() const;
 
 		//! Getter/setter for OptionalHeader.AddressOfEntryPoint
-		void SetAddressOfEntryPoint(std::uint32_t dwBase);
-		std::uint32_t GetAddressOfEntryPoint() const;
+		void setAddressOfEntryPoint(std::uint32_t dwBase);
+		std::uint32_t getAddressOfEntryPoint() const;
 
 		//! Getter for OptionalHeader.FileAlignment
-		std::uint32_t GetFileAlignment() const;
+		std::uint32_t getFileAlignment() const;
 
 		//! Getter for OptionalHeader.SectionAlignment
-		std::uint32_t GetSectionAlignment() const;
+		std::uint32_t getSectionAlignment() const;
 
 		//! Get data directory
-		detail::Image_t<>::DataDirectory_t& GetDataDirectory(int idx) const {
+		detail::Image_t<>::DataDirectory_t& getDataDir(int idx) const {
 			return m_base->DataDirectory[idx];
 		}
 
 		//! Calculate the number of directories present (not NumberOfRvaAndSizes)
-		std::uint32_t DirectoryCount() const {
+		std::uint32_t getDirectoryCount() const {
 			std::uint32_t count{ 0ul };
 			for (int i = 0; i < MAX_DIRECTORY_COUNT; i++)
 			{
-				if (GetDataDirectory(i).Size > 0) {
+				if (getDataDir(i).Size > 0) {
 					++count;
 				}
 			}
@@ -102,12 +106,12 @@ namespace pepp
 		}
 
 		//! Check if image has relocations
-		bool HasRelocations() const;
+		bool hasRelocations() const;
 
 	private:
 		void _setup(Image<bitsize>* image) {
 			m_Image = image;
-			m_base = &image->GetPEHeader().native()->OptionalHeader;
+			m_base = &image->getPEHdr().native()->OptionalHeader;
 		}
 	};
 }

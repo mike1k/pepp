@@ -5,11 +5,11 @@
 namespace pepp::io
 {
     enum FileFlags {
-        FILE_INPUT = 1,
-        FILE_OUTPUT = 2,
-        FILE_APP = 8,
-        FILE_TRUNC = 16,
-        FILE_BINARY = 32
+        kFileInput = 1,
+        kFileOutput = 2,
+        kFileApp = 8,
+        kFileTrunc = 16,
+        kFileBinary = 32
     };
 
     class File {
@@ -22,6 +22,8 @@ namespace pepp::io
 
         void Write(std::string_view text);
         void Write(const std::vector<std::uint8_t>& data);
+        void Write(void* data, size_t size);
+        bool Exists();
         std::vector<std::uint8_t> Read();
         std::uintmax_t GetSize();
 

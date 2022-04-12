@@ -59,69 +59,69 @@ namespace pepp
 		}
 
 		//! Getter/setter for SectionHeader.Name
-		void SetName(std::string_view name);
-		std::string GetName() const;
+		void setName(std::string_view name);
+		std::string getName() const;
 
 		//! Getter/setters for SectionHeader.Misc
-		std::uint32_t GetFileAddress() const;
-		void SetFileAddress(std::uint32_t fileAddress);
+		std::uint32_t getFileAddress() const;
+		void setFileAddress(std::uint32_t fileAddress);
 
-		std::uint32_t GetVirtualSize() const;
-		void SetVirtualSize(std::uint32_t virtualSize);
+		std::uint32_t getVirtualSize() const;
+		void setVirtualSize(std::uint32_t virtualSize);
 
 		//! Getter/setter for VirtualAddress
-		std::uint32_t GetVirtualAddress() const;
-		void SetVirtualAddress(std::uint32_t va);
+		std::uint32_t getVirtualAddress() const;
+		void setVirtualAddress(std::uint32_t va);
 
 		//! Getter/setter for SizeOfRawData
-		std::uint32_t GetSizeOfRawData() const;
-		void SetSizeOfRawData(std::uint32_t sz);
+		std::uint32_t getSizeOfRawData() const;
+		void setSizeOfRawData(std::uint32_t sz);
 		 
 		//! Getter/setter for SizeOfRawData
-		std::uint32_t GetPointerToRawData() const;
-		void SetPointerToRawData(std::uint32_t ptr);
+		std::uint32_t getPtrToRawData() const;
+		void setPointerToRawData(std::uint32_t ptr);
 
 		//! Getter/setter for PointerToRelocations
-		std::uint32_t GetPointerToRelocations() const;
-		void SetPointerToRelocations(std::uint32_t ptr);
+		std::uint32_t getPtrToRelocations() const;
+		void setPtrToRelocations(std::uint32_t ptr);
 
 		//! Getter/setter for PointerToLinenumbers
-		std::uint32_t GetPointerToLinenumbers() const;
-		void SetPointerToLinenumbers(std::uint32_t ptr);
+		std::uint32_t getPtrToLinenumbers() const;
+		void setPtrToLinenumbers(std::uint32_t ptr);
 		
 		//! Getter/setter for NumberOfRelocations
-		std::uint16_t GetNumberOfRelocations() const;
-		void SetNumberOfRelocations(std::uint16_t num);
+		std::uint16_t getNumberOfRelocations() const;
+		void setNumberOfRelocations(std::uint16_t num);
 		
 		//! Getter/setter for 
-		std::uint16_t GetNumberOfLinenumbers() const;
-		void SetNumberOfLinenumbers(std::uint16_t num);
+		std::uint16_t getNumberOfLinenumbers() const;
+		void setNumberOfLinenumbers(std::uint16_t num);
 
 		//! Getter/setter for 
-		std::uint32_t GetCharacteristics() const;
-		void SetCharacteristics(std::uint32_t chars);
+		std::uint32_t getCharacteristics() const;
+		void setCharacteristics(std::uint32_t chars);
 
 
 		// Section utility functions
-		void AddCharacteristic(std::uint32_t dwChar) {
+		void addCharacteristic(std::uint32_t dwChar) {
 			m_base.Characteristics |= dwChar;
 		}
-		void StripCharacteristic(std::uint32_t dwChar) {
+		void stripCharacteristic(std::uint32_t dwChar) {
 			m_base.Characteristics &= ~dwChar;
 		} 
-		bool IsReadable() const {
-			return GetCharacteristics() & SCN_MEM_READ;
+		bool isReadable() const {
+			return getCharacteristics() & SCN_MEM_READ;
 		}
-		bool IsWriteable() const {
-			return GetCharacteristics() & SCN_MEM_WRITE;
+		bool isWriteable() const {
+			return getCharacteristics() & SCN_MEM_WRITE;
 		}
-		bool IsExecutable() const {
-			return GetCharacteristics() & SCN_MEM_EXECUTE;
+		bool isExecutable() const {
+			return getCharacteristics() & SCN_MEM_EXECUTE;
 		}
-		bool HasVirtualAddress(std::uint32_t va) const {
+		bool hasVirtualAddress(std::uint32_t va) const {
 			return va >= m_base.VirtualAddress && va < m_base.VirtualAddress + m_base.Misc.VirtualSize;
 		}
-		bool HasOffset(std::uint32_t offset) const {
+		bool hasOffset(std::uint32_t offset) const {
 			return offset >= m_base.PointerToRawData && offset < m_base.PointerToRawData + m_base.SizeOfRawData;
 		}
 	};

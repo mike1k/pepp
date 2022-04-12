@@ -4,14 +4,14 @@
 #include "Concept.hpp"
 
 namespace pepp {
-	template<typename ValueType = std::uintptr_t>
+	template<typename value_t = std::uintptr_t>
 	class Address
 	{
-		ValueType	m_address;
+		value_t	m_address;
 	public:
 		template<typename T>
 		constexpr Address(T value = 0)  noexcept requires pepp::msc::MemoryAddress<T>
-			: m_address((ValueType)(value))
+			: m_address((value_t)(value))
 		{
 		}
 
@@ -29,13 +29,24 @@ namespace pepp {
 			return m_address;
 		}
 
-		constexpr uintptr_t uintptr() const noexcept
+		constexpr value_t uintptr() const noexcept
 		{
 			return m_address;
 		}
 
+		constexpr size_t size() const noexcept
+		{
+			return sizeof value_t;
+		}
+
 		template<typename C>
-		C* as_ptr() noexcept requires pepp::msc::MemoryAddress<C*>
+		C* ptr() noexcept requires pepp::msc::MemoryAddress<C*>
+		{
+			return reinterpret_cast<C*>(m_address);
+		}
+
+		template<typename C>
+		C* ptr() const noexcept requires pepp::msc::MemoryAddress<C*>
 		{
 			return reinterpret_cast<C*>(m_address);
 		}
@@ -47,15 +58,23 @@ namespace pepp {
 		}
 
 		template<typename C>
+		C as() const noexcept
+		{
+			return (C)m_address;
+		}
+
+		template<typename C>
 		C& deref() noexcept
 		{
 			return *reinterpret_cast<C*>(m_address);
 		}
 
+		template<typename C>
+		C& deref(size_t idx) noexcept
+		{
+			return *reinterpret_cast<C*>(m_address + idx);
+		}
 
-		/*
-		*! Comparison operators
-		*/
 		constexpr bool operator==(const Address& rhs) const noexcept
 		{
 			return m_address == rhs.m_address;
@@ -86,11 +105,6 @@ namespace pepp {
 			return m_address < rhs.m_address;
 		}
 
-		/*
-		/! Arithmetic operators
-		*/
-
-
 		constexpr Address operator+(const Address& rhs) const noexcept
 		{
 			return m_address + rhs.m_address;
@@ -111,10 +125,6 @@ namespace pepp {
 			return m_address / rhs.m_address;
 		}
 
-		/*
-		/!
-		*/
-
 		constexpr Address& operator+=(const Address& rhs) noexcept
 		{
 			m_address += rhs.m_address;
@@ -132,11 +142,6 @@ namespace pepp {
 			m_address *= rhs.m_address;
 			return *this;
 		}
-
-
-		/*
-		/! Bitwise operators
-		*/
 
 		constexpr Address operator>>(const Address& rhs) const noexcept
 		{

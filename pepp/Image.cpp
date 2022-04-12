@@ -10,6 +10,7 @@ template class Image<64>;
 
 template<unsigned int bitsize>
 Image<bitsize>::Image()
+	: m_isParsed(false)
 {
 }
 
@@ -18,6 +19,7 @@ Image<bitsize>::Image(const Image& rhs)
 	: m_fileName(rhs.m_fileName)
 	//, m_imageBuffer(std::move(rhs.m_imageBuffer)) -- bad
 	, m_imageBuffer(rhs.m_imageBuffer)
+	, m_isParsed(false)
 {
 	// Ensure that the file was read.
 	assert(m_imageBuffer.size() > 0);
@@ -27,7 +29,7 @@ Image<bitsize>::Image(const Image& rhs)
 }
 
 template<unsigned int bitsize>
-constexpr PEMachine Image<bitsize>::GetMachine() const
+constexpr PEMachine Image<bitsize>::getMachine() const
 {
 	if constexpr (bitsize == 32)
 		return PEMachine::MACHINE_I386;
@@ -39,8 +41,9 @@ constexpr PEMachine Image<bitsize>::GetMachine() const
 template<unsigned int bitsize>
 Image<bitsize>::Image(std::string_view filepath)
 	: m_fileName(filepath)
+	, m_isParsed(false)
 {
-	io::File file(m_fileName, io::FILE_INPUT | io::FILE_BINARY);
+	io::File file(m_fileName, io::kFileInput | io::kFileBinary);
 
 	std::vector<uint8_t> data{ file.Read() };
 
@@ -56,6 +59,7 @@ Image<bitsize>::Image(std::string_view filepath)
 
 template<unsigned int bitsize>
 Image<bitsize>::Image(const void* data, std::size_t size)
+	: m_isParsed(false)
 {
 	m_imageBuffer.resize(size);
 	std::memcpy(&m_imageBuffer[0], data, size);
@@ -65,38 +69,17 @@ Image<bitsize>::Image(const void* data, std::size_t size)
 }
 
 template<unsigned int bitsize>
-[[nodiscard]] Image<bitsize> Image<bitsize>::FromRuntimeMemory(void* data, std::size_t size) noexcept
+void pepp::Image<bitsize>::setFromMemory(const void* data, std::size_t size)
 {
-	Image<bitsize> _r;
+	m_imageBuffer.resize(size);
+	std::memcpy(&m_imageBuffer[0], data, size);
 
-	_r.m_MZHeader = reinterpret_cast<detail::Image_t<>::MZHeader_t*>(data);
-
-	// Valid MZ tag?
-	assert(_r.magic() == IMAGE_DOS_SIGNATURE);
-
-	// Setup the PE header data.
-	_r.m_PEHeader._setup(&_r);
-
-	assert(_r.m_PEHeader.IsTaggedPE());
-
-	_r.m_imageBuffer.resize(size);
-	std::memcpy(&_r.m_imageBuffer[0], data, _r.m_imageBuffer.size());
-
-	//
-	// Okay just _validate now.
-	_r._validate();
-
-	//
-	// It's runtime, so map it.
-	_r.SetMapped(); 
-	_r._validate();
-
-
-	return _r;
+	// Validate there is a valid MZ signature.
+	_validate();
 }
 
 template<unsigned int bitsize>
-bool Image<bitsize>::SetFromRuntimeMemory(void* data, std::size_t size) noexcept
+bool Image<bitsize>::setFromMappedMemory(void* data, std::size_t size) noexcept
 {
 	m_MZHeader = reinterpret_cast<detail::Image_t<>::MZHeader_t*>(data);
 
@@ -106,18 +89,16 @@ bool Image<bitsize>::SetFromRuntimeMemory(void* data, std::size_t size) noexcept
 	// Setup the PE header data.
 	m_PEHeader._setup(this);
 
-	assert(m_PEHeader.IsTaggedPE());
+	assert(m_PEHeader.isTaggedPE());
 
 	m_imageBuffer.resize(size);
 	std::memcpy(&m_imageBuffer[0], data, m_imageBuffer.size());
 
-	//
 	// Okay just _validate now.
 	_validate();
 
-	//
 	// It's runtime, so map it.
-	SetMapped();
+	setAsMapped();
 	_validate();
 
 
@@ -125,15 +106,39 @@ bool Image<bitsize>::SetFromRuntimeMemory(void* data, std::size_t size) noexcept
 }
 
 template<unsigned int bitsize>
-bool Image<bitsize>::HasDataDirectory(PEDirectoryEntry entry)
+bool pepp::Image<bitsize>::setFromFilePath(std::string_view file_path)
 {
-	return GetPEHeader().GetOptionalHeader().GetDataDirectory(entry).Size > 0;
+	m_fileName = file_path;
+
+	io::File file(m_fileName, io::kFileInput | io::kFileBinary);
+
+	if (!file.Exists())
+		return false;
+
+	std::vector<uint8_t> data{ file.Read() };
+
+	m_imageBuffer.resize(data.size());
+	m_imageBuffer.copy_data(0, data.data(), data.size());
+
+	// Ensure that the file was read.
+	assert(m_imageBuffer.size() > 0);
+
+	// Validate there is a valid MZ signature.
+	_validate();
+
+	return wasParsed();
 }
 
 template<unsigned int bitsize>
-void Image<bitsize>::WriteToFile(std::string_view filepath)
+bool Image<bitsize>::hasDataDirectory(PEDirectoryEntry entry)
 {
-	io::File file(filepath, io::FILE_OUTPUT | io::FILE_BINARY);
+	return getPEHdr().getOptionalHdr().getDataDir(entry).Size > 0;
+}
+
+template<unsigned int bitsize>
+void Image<bitsize>::writeToFile(std::string_view filepath)
+{
+	io::File file(filepath, io::kFileOutput | io::kFileBinary);
 	file.Write(m_imageBuffer);
 }
 
@@ -143,85 +148,162 @@ void Image<bitsize>::_validate()
 	m_MZHeader = reinterpret_cast<detail::Image_t<>::MZHeader_t*>(base());
 
 	// Valid MZ tag?
-	assert(magic() == IMAGE_DOS_SIGNATURE);
+	if (magic() != IMAGE_DOS_SIGNATURE)
+		return;
 
 	// Setup the PE header data.
 	m_PEHeader._setup(this);
 
-	assert(m_PEHeader.IsTaggedPE());
+	if (!m_PEHeader.isTaggedPE())
+		return;
 
 	// Setup sections
 	m_rawSectionHeaders = (m_PEHeader.m_PEHdr ? reinterpret_cast<SectionHeader*>(IMAGE_FIRST_SECTION(m_PEHeader.m_PEHdr)) : nullptr);
 
-	assert(m_rawSectionHeaders != nullptr);
+	if (m_rawSectionHeaders == nullptr)
+		return;
 
-	//
 	// Ensure the Image class was constructed with the correct bitsize.
 	if constexpr (bitsize == 32)
 	{
-		assert(m_PEHeader.GetOptionalHeader().GetMagic() == PEMagic::HDR_32);
+		if (m_PEHeader.getOptionalHdr().getMagic() != PEMagic::HDR_32)
+			return;
 	}
 	else if constexpr (bitsize == 64)
 	{
-		assert(m_PEHeader.GetOptionalHeader().GetMagic() == PEMagic::HDR_64);
+		if (m_PEHeader.getOptionalHdr().getMagic() != PEMagic::HDR_64)
+			return;
 	}
 
-	//
 	// Setup export directory
 	m_exportDirectory._setup(this);
-	//
+
 	// Setup import directory
 	m_importDirectory._setup(this);
-	//
+
 	// Setup reloc directory
 	m_relocDirectory._setup(this);
+
+	// We hit the end, so everything should be properly parsed.
+	m_isParsed = true;
 }
 
 template<unsigned int bitsize>
-bool Image<bitsize>::AppendExport(std::string_view exportName, std::uint32_t rva)
+bool Image<bitsize>::appendExport(std::string_view exportName, std::uint32_t rva)
 {
-	GetExportDirectory().AddExport(exportName, rva);
+	getExportDir().add(exportName, rva);
 	return false;
 }
 
 template<unsigned int bitsize>
-bool Image<bitsize>::ExtendSection(std::string_view sectionName, std::uint32_t delta)
+void pepp::Image<bitsize>::scrambleVaData(uint32_t va, uint32_t size)
 {
-	std::uint32_t fileAlignment = GetPEHeader().GetOptionalHeader().GetFileAlignment();
-	std::uint32_t sectAlignment = GetPEHeader().GetOptionalHeader().GetSectionAlignment();
+	//if (va > GetPEHeader().GetOptionalHeader().GetSizeOfImage())
+	//	return;
+
+	uint32_t offset = getPEHdr().rvaToOffset(va);
+
+	for (uint32_t i = 0; i < size; ++i)
+	{
+		if ((offset + i) > buffer().size())
+			break;
+
+		buffer().deref<uint8_t>(offset + i) = rand() % 0xff;
+	}
+}
+
+template<unsigned int bitsize>
+bool pepp::Image<bitsize>::isDll() const
+{
+	return this->getPEHdr().getFileHdr().getCharacteristics() & IMAGE_FILE_DLL;
+}
+
+template<unsigned int bitsize>
+bool pepp::Image<bitsize>::isSystemFile() const
+{
+	return this->getPEHdr().getFileHdr().getCharacteristics() & IMAGE_FILE_SYSTEM;
+}
+
+template<unsigned int bitsize>
+bool pepp::Image<bitsize>::isDllOrSystemFile() const
+{
+	return isDll() || isSystemFile();
+}
+
+template<unsigned int bitsize>
+void pepp::Image<bitsize>::relocateImage(uintptr_t imageBase)
+{
+	uintptr_t delta = (imageBase - getImageBase());
+
+	m_relocDirectory.forEachEntry(
+		[&](BlockEntry& entry)
+		{
+			uint32_t offset = getPEHdr().rvaToOffset(entry.getRva());
+
+			switch (entry.getType())
+			{
+			case RelocationType::REL_BASED_ABSOLUTE:
+				break;
+			case RelocationType::REL_BASED_DIR64:
+				if constexpr (bitsize == 32)
+					DebugBreak();
+				buffer().deref<uint64_t>(offset) += delta;
+				break;
+			case RelocationType::REL_BASED_HIGHLOW:
+				buffer().deref<uint32_t>(offset) += (uint32_t)delta;
+				break;
+			case RelocationType::REL_BASED_HIGH:
+				buffer().deref<uint16_t>(offset) += HIWORD(delta);
+				break;
+			case RelocationType::REL_BASED_LOW:
+				buffer().deref<uint16_t>(offset) += LOWORD(delta);
+				break;
+			default:
+				DebugBreak();
+			}
+		}
+	);
+}
+
+template<unsigned int bitsize>
+bool Image<bitsize>::extendSection(std::string_view sectionName, std::uint32_t delta)
+{
+	std::uint32_t fileAlignment = getPEHdr().getOptionalHdr().getFileAlignment();
+	std::uint32_t sectAlignment = getPEHdr().getOptionalHdr().getSectionAlignment();
 	if (fileAlignment == 0 || sectAlignment == 0 || delta == 0)
 		return false;
 
-	SectionHeader& header = GetSectionHeader(sectionName);
+	SectionHeader& header = getSectionHdr(sectionName);
 
-	if (header.GetName() != ".dummy")
+	if (header.getName() != ".dummy")
 	{
 		std::unique_ptr<uint8_t> zero_buf(new uint8_t[delta]{});
 
+		uint32_t ptr = header.getPtrToRawData() + header.getSizeOfRawData();
 
-		header.SetSizeOfRawData(header.GetSizeOfRawData() + delta);
-		header.SetVirtualSize(header.GetVirtualSize() + delta);
+		header.setSizeOfRawData(align(header.getSizeOfRawData() + delta, fileAlignment));
+		header.setVirtualSize(header.getVirtualSize() + delta);
 
 		for (int i = 0; i < MAX_DIRECTORY_COUNT; i++)
 		{
-			auto& dir = GetPEHeader().GetOptionalHeader().GetDataDirectory(i);
+			auto& dir = getPEHdr().getOptionalHdr().getDataDir(i);
 
-			if (dir.VirtualAddress == header.GetVirtualAddress())
+			if (dir.VirtualAddress == header.getVirtualAddress())
 			{
-				dir.Size = header.GetVirtualSize();
+				dir.Size += delta;
 				break;
 			}
 		}
 
-		//
 		// Update image size
-		GetPEHeader().GetOptionalHeader().SetSizeOfImage(GetPEHeader().GetOptionalHeader().GetSizeOfImage() + delta);
+		getPEHdr().getOptionalHdr().setSizeOfImage(align(getPEHdr().getOptionalHdr().getSizeOfImage() + delta, sectAlignment));
 
-		//
 		// Fill in data
-		buffer().insert_data(header.GetPointerToRawData() + header.GetSizeOfRawData(), zero_buf.get(), delta);
-
-		//
+		//buffer().insert_data(header.getPtrToRawData() + header.getSizeOfRawData(), zero_buf.get(), delta);
+		//buffer().insert_data(header.getPtrToRawData() + header.getSizeOfRawData() - delta, zero_buf.get(), delta);
+		buffer().insert(buffer().begin() + ptr, align(delta, fileAlignment), 0);
+		//buffer().resize(align(buffer().size() + delta, fileAlignment));
+		
 		// Re-validate the image/headers.
 		_validate();
 
@@ -232,26 +314,26 @@ bool Image<bitsize>::ExtendSection(std::string_view sectionName, std::uint32_t d
 }
 
 template<unsigned int bitsize>
-std::uint32_t Image<bitsize>::FindPadding(SectionHeader* s, std::uint8_t v, std::size_t n, std::uint32_t alignment)
+std::uint32_t Image<bitsize>::findPadding(SectionHeader* s, std::uint8_t v, std::size_t n, std::uint32_t alignment)
 {
 	bool bTraverseUp = s == nullptr;
 	std::uint32_t startOffset{};
 
-	n = pepp::Align(n, alignment);
+	n = align(n, alignment);
 
 	if (s == nullptr)
-		s = &m_rawSectionHeaders[GetNumberOfSections() - 1];
+		s = &m_rawSectionHeaders[getNumberOfSections() - 1];
 
-	startOffset = s->GetPointerToRawData();
+	startOffset = s->getPtrToRawData();
 
 	std::vector<uint8_t>::iterator it = buffer().end();
 
+	// Start from bottom to top, or vice versa?
 	if (bTraverseUp)
 	{
-		//
 		std::vector<uint8_t> tmpData(n, v);
 
-		for (std::uint32_t i = startOffset + s->GetSizeOfRawData(); i > n; i = Align(i - n, alignment))
+		for (std::uint32_t i = startOffset + s->getSizeOfRawData(); i > n; i = align(i - n, alignment))
 		{
 			if (memcmp(&buffer()[i - n], tmpData.data(), tmpData.size()) == 0)
 			{
@@ -264,7 +346,7 @@ std::uint32_t Image<bitsize>::FindPadding(SectionHeader* s, std::uint8_t v, std:
 	{
 		std::vector<uint8_t> tmpData(n, v);
 
-		for (std::uint32_t i = startOffset; i < startOffset + (buffer().size() - startOffset); i = Align(i + n, alignment))
+		for (std::uint32_t i = startOffset; i < startOffset + (buffer().size() - startOffset); i = align(i + n, alignment))
 		{
 			if (memcmp(&buffer()[i], tmpData.data(), tmpData.size()) == 0)
 			{
@@ -282,13 +364,13 @@ std::uint32_t Image<bitsize>::FindPadding(SectionHeader* s, std::uint8_t v, std:
 }
 
 template<unsigned int bitsize>
-std::uint32_t Image<bitsize>::FindZeroPadding(SectionHeader* s, std::size_t n, std::uint32_t alignment)
+std::uint32_t Image<bitsize>::findZeroPadding(SectionHeader* s, std::size_t n, std::uint32_t alignment)
 {
-	return FindPadding(s, 0x0, n, alignment);
+	return findPadding(s, 0x0, n, alignment);
 }
 
 template<unsigned int bitsize>
-std::vector<std::uint32_t> Image<bitsize>::FindBinarySequence(SectionHeader* s, std::string_view binary_seq) const
+std::vector<std::uint32_t> Image<bitsize>::findBinarySequence(SectionHeader* s, std::string_view binary_seq) const
 {
 	constexpr auto ascii_to_byte = [](const char ch) [[msvc::forceinline]] {
 				if (ch >= '0' && ch <= '9')
@@ -301,13 +383,13 @@ std::vector<std::uint32_t> Image<bitsize>::FindBinarySequence(SectionHeader* s, 
 	std::vector<std::uint32_t> offsets{};
 
 	if (s == nullptr)
-		s = &m_rawSectionHeaders[GetNumberOfSections() - 1];
+		s = &m_rawSectionHeaders[getNumberOfSections() - 1];
 
-	std::uint32_t start_offset = s->GetPointerToRawData();
+	std::uint32_t start_offset = s->getPtrToRawData();
 	std::uint32_t result = 0;
 	std::uint32_t match_count = 0;
 
-	for (std::uint32_t i = start_offset; i <= start_offset + s->GetSizeOfRawData(); ++i)
+	for (std::uint32_t i = start_offset; i <= start_offset + s->getSizeOfRawData(); ++i)
 	{
 		for (int c = 0; c < binary_seq.size();)
 		{
@@ -349,7 +431,7 @@ std::vector<std::uint32_t> Image<bitsize>::FindBinarySequence(SectionHeader* s, 
 }
 
 template<unsigned int bitsize>
-std::vector<std::pair<std::int32_t, std::uint32_t>> Image<bitsize>::FindBinarySequences(SectionHeader* s, std::initializer_list<std::pair<std::int32_t, std::string_view>> binary_seq) const
+std::vector<std::pair<std::int32_t, std::uint32_t>> Image<bitsize>::findBinarySequences(SectionHeader* s, std::initializer_list<std::pair<std::int32_t, std::string_view>> binary_seq) const
 {
 	constexpr auto ascii_to_byte = [](const char ch) [[msvc::forceinline]] {
 				if (ch >= '0' && ch <= '9')
@@ -362,13 +444,13 @@ std::vector<std::pair<std::int32_t, std::uint32_t>> Image<bitsize>::FindBinarySe
 	std::vector<std::pair<std::int32_t, std::uint32_t>> offsets{};
 
 	if (s == nullptr)
-		s = &m_rawSectionHeaders[GetNumberOfSections() - 1];
+		s = &m_rawSectionHeaders[getNumberOfSections() - 1];
 
-	std::uint32_t start_offset = s->GetPointerToRawData();
+	std::uint32_t start_offset = s->getPtrToRawData();
 	std::pair<std::int32_t, std::uint32_t> result{};
 	std::uint32_t match_count = 0;
 
-	for (std::uint32_t i = start_offset; i <= start_offset + s->GetSizeOfRawData(); ++i)
+	for (std::uint32_t i = start_offset; i <= start_offset + s->getSizeOfRawData(); ++i)
 	{
 		for (auto const& seq : binary_seq)
 		{
@@ -417,50 +499,48 @@ std::vector<std::pair<std::int32_t, std::uint32_t>> Image<bitsize>::FindBinarySe
 }
 
 template<unsigned int bitsize>
-bool Image<bitsize>::AppendSection(std::string_view section_name, std::uint32_t size, std::uint32_t chrs, SectionHeader* out)
+bool Image<bitsize>::appendSection(std::string_view section_name, std::uint32_t size, std::uint32_t chrs, SectionHeader* out)
 {
-	std::uint32_t fileAlignment = GetPEHeader().GetOptionalHeader().GetFileAlignment();
-	std::uint32_t sectAlignment = GetPEHeader().GetOptionalHeader().GetSectionAlignment();
+	std::uint32_t fileAlignment = getPEHdr().getOptionalHdr().getFileAlignment();
+	std::uint32_t sectAlignment = getPEHdr().getOptionalHdr().getSectionAlignment();
 	if (fileAlignment == 0 || sectAlignment == 0)
 		return false;
 
-	std::uint32_t alignedFileSize = Align(size, fileAlignment);
-	std::uint32_t alignedVirtSize = Align(size, sectAlignment);
+	std::uint32_t alignedFileSize = align(size, fileAlignment);
+	std::uint32_t alignedVirtSize = size;
+	std::uint32_t oldFileSize = getPEHdr().getOptionalHdr().getSizeOfImage();
+	size_t oldSize = buffer().size();
 
-	//
 	// Build a section (these should be the only necessary values to fill)
 	SectionHeader sec;
-	sec.SetName(section_name);
-	sec.SetSizeOfRawData(alignedFileSize);
-	sec.SetVirtualSize(alignedVirtSize);
-	sec.SetCharacteristics(chrs);
-	sec.SetVirtualAddress(GetPEHeader().GetNextSectionRva());
-	sec.SetPointerToRawData(GetPEHeader().GetNextSectionOffset());
+	memset(&sec, 0, sizeof(sec));
 
-	//
+	sec.setName(section_name);
+	sec.setSizeOfRawData(alignedFileSize);
+	sec.setVirtualSize(alignedVirtSize);
+	sec.setCharacteristics(chrs);
+	sec.setVirtualAddress(getPEHdr().getNextSectionRva());
+	sec.setPointerToRawData(getPEHdr().getNextSectionOffset());
+
 	// Update image size
-	GetPEHeader().GetOptionalHeader().SetSizeOfImage(GetPEHeader().GetOptionalHeader().GetSizeOfImage() + sec.GetVirtualSize());
-	//
-	// Update number of sections.
-	GetPEHeader().GetFileHeader().SetNumberOfSections(GetNumberOfSections() + 1);
+	getPEHdr().getOptionalHdr().setSizeOfImage(align4kb(getPEHdr().getOptionalHdr().getSizeOfImage() + size));
 
-	//
-	// Fill in some temp data
-	std::vector<std::uint8_t> section_data(sec.GetSizeOfRawData());
-	std::fill(section_data.begin(), section_data.end(), 0x0);
+	// Update PE header info.
+	uint32_t numSections = getNumberOfSections();
+	getPEHdr().getFileHdr().setNumberOfSections(numSections + 1);
+	getPEHdr().getOptionalHdr().setSizeOfCode(getPEHdr().getOptionalHdr().getSizeOfCode() + alignedVirtSize);
+	getPEHdr().getOptionalHdr().setSizeOfHeaders(getPEHdr().getOptionalHdr().getSizeOfHeaders() + sizeof(sec));
 
-	//
 	// Add it in the raw section header
-	std::memcpy(&m_rawSectionHeaders[GetNumberOfSections() - 1], &sec, sizeof(SectionHeader));
+	SectionHeader& lastHdr = getSectionHdr(numSections);
+	memcpy(&lastHdr, &sec, sizeof(sec));
 
 	if (out)
-		std::memcpy(out, &m_rawSectionHeaders[GetNumberOfSections() - 1], sizeof(SectionHeader));
+		memcpy(out, &m_rawSectionHeaders[numSections], sizeof(SectionHeader));
 
-	//
-	// Finally, append it to the image buffer.
-	buffer().insert_data(sec.GetPointerToRawData(), section_data.data(), section_data.size());
+	// buffer().resize(buffer().size() + alignedFileSize);
+	buffer().insert(buffer().begin() + sec.getPtrToRawData(), alignedFileSize, 0);
 
-	//
 	// Re-validate the image/headers.
 	_validate();
 
@@ -469,15 +549,43 @@ bool Image<bitsize>::AppendSection(std::string_view section_name, std::uint32_t 
 
 
 template<unsigned int bitsize>
-void pepp::Image<bitsize>::SetMapped() noexcept
+void pepp::Image<bitsize>::setAsMapped() noexcept
 {
-	for (std::uint16_t i = 0; i < GetNumberOfSections(); ++i)
+	for (std::uint16_t i = 0; i < getNumberOfSections(); ++i)
 	{
-		SectionHeader& sec = GetSectionHeader(i);
+		SectionHeader& sec = getSectionHdr(i);
 
-		sec.SetPointerToRawData(sec.GetVirtualAddress());
-		sec.SetSizeOfRawData(sec.GetVirtualSize());
+		sec.setPointerToRawData(sec.getVirtualAddress());
+		sec.setSizeOfRawData(sec.getVirtualSize());
 	}
 
-	m_mem_mapped = true;
+	m_isMemMapped = true;
+}
+
+template<unsigned int bitsize>
+void pepp::Image<bitsize>::mapToBuffer(pepp::Address<> basePtr, const std::vector<std::string>& ignore)
+{
+	for (int i = 0; i < getNumberOfSections(); ++i)
+	{
+		SectionHeader& sec = getSectionHdr(i);
+
+		bool bSkip = false;
+
+		if (!ignore.empty())
+		{
+			for (auto& item : ignore)
+			{
+				if (item == sec.getName())
+				{
+					bSkip = true;
+					break;
+				}
+			}
+		}
+
+		if (bSkip)
+			continue;
+
+		memcpy((basePtr.ptr<char>() + sec.getVirtualAddress()), &base()[sec.getPtrToRawData()], sec.getSizeOfRawData());
+	}
 }
