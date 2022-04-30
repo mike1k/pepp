@@ -2,6 +2,39 @@
 
 namespace pepp
 {
+	enum class PEMachine
+	{
+		MACHINE_I386 = 0x14c,
+		MACHINE_IA64 = 0x200,
+		MACHINE_AMD64 = 0x8664
+	};
+
+	enum PEDirectoryEntry
+	{
+		DIRECTORY_ENTRY_EXPORT = 0,   // Export Directory
+		DIRECTORY_ENTRY_IMPORT = 1,   // Import Directory
+		DIRECTORY_ENTRY_RESOURCE = 2,   // Resource Directory
+		DIRECTORY_ENTRY_EXCEPTION = 3,   // Exception Directory
+		DIRECTORY_ENTRY_SECURITY = 4,   // Security Directory
+		DIRECTORY_ENTRY_BASERELOC = 5,   // Base Relocation Table
+		DIRECTORY_ENTRY_DEBUG = 6,   // Debug Directory
+		DIRECTORY_ENTRY_ARCHITECTURE = 7,   // Architecture Specific Data
+		DIRECTORY_ENTRY_GLOBALPTR = 8,   // RVA of GP
+		DIRECTORY_ENTRY_TLS = 9,   // TLS Directory
+		DIRECTORY_ENTRY_LOAD_CONFIG = 10,   // Load Configuration Directory
+		DIRECTORY_ENTRY_BOUND_IMPORT = 11,   // Bound Import Directory in headers
+		DIRECTORY_ENTRY_IAT = 12,   // Import Address Table
+		DIRECTORY_ENTRY_DELAY_IMPORT = 13,   // Delay Load Import Descriptors
+		DIRECTORY_ENTRY_COM_DESCRIPTOR = 14    // COM Runtime descriptor
+	};
+
+	enum class PEMagic
+	{
+		HDR_32 = 0x10b,
+		HDR_64 = 0x20b,
+		HDR_ROM = 0x107
+	};
+
 	template<unsigned int>
 	class PEHeader;
 	class SectionHeader;
@@ -11,9 +44,6 @@ namespace pepp
 	class ImportDirectory;
 	template<unsigned int>
 	class RelocationDirectory;
-	enum SectionCharacteristics;
-	enum PEDirectoryEntry;
-	enum class PEMachine;
 
 	namespace detail
 	{
@@ -60,8 +90,8 @@ namespace pepp
 	class Image : pepp::msc::NonCopyable
 	{
 		using CPEHeader = const PEHeader<bitsize>;
-		using CExportDirectory = const ExportDirectory;
-		using CImportDirectory = const ImportDirectory;
+		using CExportDirectory = const ExportDirectory<bitsize>;
+		using CImportDirectory = const ImportDirectory<bitsize>;
 
 	public:
 
@@ -126,7 +156,7 @@ namespace pepp
 		}
 
 		// - Get the Image Base
-		detail::Image_t<bitsize>::Address_t getImageBase() const noexcept {
+		Address<> getImageBase() const noexcept {
 			return m_PEHeader.getOptionalHdr().getImageBase();
 		}
 
@@ -210,7 +240,7 @@ namespace pepp
 		// - Check if a data directory is "present"
 		// - - Necessary before actually using the directory
 		// -  (e.g not all images will have a valid IMAGE_EXPORT_DIRECTORY)
-		bool hasDataDirectory(PEDirectoryEntry entry);
+		bool hasDataDirectory( PEDirectoryEntry entry);
 
 		// - Write out to file
 		void writeToFile(std::string_view filepath);

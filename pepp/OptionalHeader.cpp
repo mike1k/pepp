@@ -2,10 +2,6 @@
 
 using namespace pepp;
 
-// Explicit templates.
-template class OptionalHeader<32>;
-template class OptionalHeader<64>;
-
 template<unsigned int bitsize>
 inline OptionalHeader<bitsize>::OptionalHeader()
 {
@@ -25,13 +21,13 @@ PEMagic OptionalHeader<bitsize>::getMagic() const
 
 
 template<unsigned int bitsize>
-void OptionalHeader<bitsize>::setImageBase(detail::Image_t<bitsize>::Address_t address)
+void OptionalHeader<bitsize>::setImageBase(typename detail::Image_t<bitsize>::Address_t address)
 {
 	m_base->ImageBase = address;
 }
 
 template<unsigned int bitsize>
-detail::Image_t<bitsize>::Address_t OptionalHeader<bitsize>::getImageBase() const
+typename detail::Image_t<bitsize>::Address_t OptionalHeader<bitsize>::getImageBase() const
 {
 	return m_base->ImageBase;
 }
@@ -136,4 +132,11 @@ template<unsigned int bitsize>
 bool OptionalHeader<bitsize>::hasRelocations() const
 {
 	return m_base->DataDirectory[DIRECTORY_ENTRY_BASERELOC].Size > 0;
+}
+
+namespace pepp
+{
+	// Explicit templates.
+	template class OptionalHeader<32>;
+	template class OptionalHeader<64>;
 }

@@ -20,7 +20,7 @@ namespace pepp
 		using ImageData_t = detail::Image_t<bitsize>;
 
 		Image<bitsize>*					m_image;
-		ImageData_t::Header_t*			m_PEHdr = nullptr;
+		typename ImageData_t::Header_t*	m_PEHdr = nullptr;
 		FileHeader						m_FileHeader;
 		OptionalHeader<bitsize>			m_OptionalHeader;
 	private:
@@ -124,7 +124,7 @@ namespace pepp
 		}
 		 
 		//! Convert a rel. virtual address to a virtual address
-		detail::Image_t<bitsize>::Address_t rvaToVa(std::uint32_t rva) const {
+		Address<> rvaToVa(std::uint32_t rva) const {
 			return m_OptionalHeader.getImageBase() + rva;
 		}
 
@@ -142,7 +142,7 @@ namespace pepp
 		}
 
 		//! Return native pointer
-		detail::Image_t<bitsize>::Header_t* native() {
+		typename detail::Image_t<bitsize>::Header_t* native() {
 			return m_PEHdr;
 		}
 

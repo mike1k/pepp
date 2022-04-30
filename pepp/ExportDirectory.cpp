@@ -2,9 +2,6 @@
 
 using namespace pepp;
 
-template class ExportDirectory<32>;
-template class ExportDirectory<64>;
-
 template<unsigned int bitsize>
 ExportData_t ExportDirectory<bitsize>::getExport(std::uint32_t idx, bool demangle /*= true*/) const
 {
@@ -20,7 +17,7 @@ ExportData_t ExportDirectory<bitsize>::getExport(std::uint32_t idx, bool demangl
 		mem::ByteVector const* buffer{};
 
 		funcOrdinals = m_image->getPEHdr().rvaToOffset(getAddressOfNameOrdinals());
-		uint16_t rlIdx = m_image->buffer().deref<uint16_t>(funcOrdinals + (idx * sizeof uint16_t));
+		uint16_t rlIdx = m_image->buffer().deref<uint16_t>(funcOrdinals + (idx * sizeof(uint16_t)));
 
 		funcAddresses = m_image->getPEHdr().rvaToOffset(getAddressOfFunctions() + sizeof(std::uint32_t) * rlIdx);
 		funcNames = m_image->getPEHdr().rvaToOffset(getAddressOfNames() + sizeof(std::uint32_t) * idx);
@@ -76,4 +73,10 @@ template<unsigned int bitsize>
 void ExportDirectory<bitsize>::add(std::string_view name, std::uint32_t rva)
 {
 	// TODO
+}
+
+namespace pepp
+{
+	template class ExportDirectory<32>;
+	template class ExportDirectory<64>;
 }

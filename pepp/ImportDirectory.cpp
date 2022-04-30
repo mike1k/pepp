@@ -3,10 +3,6 @@
 using namespace pepp;
 
 
-// Explicit templates.
-template class ImportDirectory<32>;
-template class ImportDirectory<64>;
-
 template<unsigned int bitsize>
 bool ImportDirectory<bitsize>::importsModule(std::string_view module, std::uint32_t* name_rva) const
 {
@@ -112,7 +108,7 @@ void ImportDirectory<bitsize>::addModuleImport(std::string_view module, std::str
 	while (descriptor->Characteristics != 0)
 	{
 		std::memcpy(&descriptors.get()[rawsize], descriptor, sizeof(*descriptor));
-		rawsize += sizeof detail::Image_t<>::ImportDescriptor_t;
+		rawsize += sizeof(detail::Image_t<>::ImportDescriptor_t);
 
 		std::memset(descriptor, 0x0, sizeof(*descriptor));
 
@@ -121,7 +117,7 @@ void ImportDirectory<bitsize>::addModuleImport(std::string_view module, std::str
 
 	//
 	// For the null term.
-	rawsize += sizeof detail::Image_t<>::ImportDescriptor_t;
+	rawsize += sizeof(detail::Image_t<>::ImportDescriptor_t);
 
 	//
 	// Create a new section for the descriptors
@@ -171,7 +167,7 @@ void ImportDirectory<bitsize>::addModuleImport(std::string_view module, std::str
 	m_image->getPEHdr()
 		.getOptionalHdr()
 		.getDataDir(DIRECTORY_ENTRY_IMPORT).Size
-		= vsize + sizeof detail::Image_t<>::ImportDescriptor_t;
+		= vsize + sizeof(detail::Image_t<>::ImportDescriptor_t);
 
 	std::uint32_t descriptor_offset = newSec.getPtrToRawData() + (10*PAGE_SIZE) + vsize - sizeof(*descriptor);
 	descriptor = (decltype(descriptor)) & ((*buffer)[descriptor_offset]);
@@ -282,7 +278,7 @@ void ImportDirectory<bitsize>::addModuleImports(std::string_view module, std::in
 	while (descriptor->Characteristics != 0)
 	{
 		std::memcpy(&descriptors.get()[rawsize], descriptor, sizeof(*descriptor));
-		rawsize += sizeof detail::Image_t<>::ImportDescriptor_t;
+		rawsize += sizeof(detail::Image_t<>::ImportDescriptor_t);
 
 		std::memset(descriptor, 0x0, sizeof(*descriptor));
 
@@ -291,7 +287,7 @@ void ImportDirectory<bitsize>::addModuleImports(std::string_view module, std::in
 
 	//
 	// For the null term.
-	rawsize += sizeof detail::Image_t<>::ImportDescriptor_t;
+	rawsize += sizeof(detail::Image_t<>::ImportDescriptor_t);
 
 	//
 	// Create a new section for the descriptors
@@ -339,7 +335,7 @@ void ImportDirectory<bitsize>::addModuleImports(std::string_view module, std::in
 	m_image->getPEHdr()
 		.getOptionalHdr()
 		.getDataDir(DIRECTORY_ENTRY_IMPORT).Size
-		= vsize + sizeof detail::Image_t<>::ImportDescriptor_t;
+		= vsize + sizeof(detail::Image_t<>::ImportDescriptor_t);
 
 	std::uint32_t descriptor_offset = newSec.getPtrToRawData() + PAGE_SIZE + vsize - sizeof(*descriptor);
 	descriptor = (decltype(descriptor)) & ((*buffer)[descriptor_offset]);
@@ -514,4 +510,11 @@ void pepp::ImportDirectory<bitsize>::getIATRvas(std::uint32_t begin, std::uint32
 
 	begin = iat.VirtualAddress;
 	end = begin + iat.Size;
+}
+
+namespace pepp
+{
+	// Explicit templates.
+	template class ImportDirectory<32>;
+	template class ImportDirectory<64>;
 }

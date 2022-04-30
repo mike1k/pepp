@@ -2,10 +2,6 @@
 
 using namespace pepp;
 
-// Explicit templates.
-template class PEHeader<32>;
-template class PEHeader<64>;
-
 template<unsigned int bitsize>
 inline PEHeader<bitsize>::PEHeader()
 	: m_image(nullptr)
@@ -69,4 +65,11 @@ std::uint32_t PEHeader<bitsize>::getNextSectionRva()
 	* The alignment of sections loaded in memory, in bytes.
 	*/
 	return align(uNextRva, getOptionalHdr().getSectionAlignment());
+}
+
+namespace pepp
+{
+	// Explicit templates.
+	template class PEHeader<32>;
+	template class PEHeader<64>;
 }

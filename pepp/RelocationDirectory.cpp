@@ -2,10 +2,6 @@
 
 using namespace pepp;
 
-// Explicit templates.
-template class RelocationDirectory<32>;
-template class RelocationDirectory<64>;
-
 template<unsigned int bitsize>
 int RelocationDirectory<bitsize>::getNumBlocks() const
 {
@@ -273,4 +269,11 @@ void pepp::RelocationDirectory<bitsize>::adjustBlockToFit(uint32_t delta)
 	}
 
 	base->SizeOfBlock += delta;
+}
+
+namespace pepp
+{
+	// Explicit templates.
+	template class RelocationDirectory<32>;
+	template class RelocationDirectory<64>;
 }

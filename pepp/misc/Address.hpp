@@ -36,7 +36,7 @@ namespace pepp {
 
 		constexpr size_t size() const noexcept
 		{
-			return sizeof value_t;
+			return sizeof(value_t);
 		}
 
 		template<typename C>

@@ -4,14 +4,14 @@ using namespace pepp;
 
 void SectionHeader::setName(std::string_view name)
 {
-	std:memcpy(m_base.Name, name.data(), name.size());
+	memcpy(m_base.Name, name.data(), name.size());
 	m_base.Name[name.size()] = '\0';
 }
 
 std::string SectionHeader::getName() const
 {
 	char szData[9];
-	std::memcpy(szData, m_base.Name, sizeof m_base.Name);
+	memcpy(szData, m_base.Name, sizeof m_base.Name);
 	szData[8] = '\0';
 	return szData;
 }

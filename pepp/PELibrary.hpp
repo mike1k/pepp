@@ -14,12 +14,11 @@
 #include "misc/Address.hpp"
 
 #include "Image.hpp"
-#include "PEHeader.hpp"
 #include "SectionHeader.hpp"
 #include "FileHeader.hpp"
+#include "PEHeader.hpp"
 #include "OptionalHeader.hpp"
 #include "ExportDirectory.hpp"
 #include "ImportDirectory.hpp"
 #include "RelocationDirectory.hpp"
 #include "PEUtil.hpp"
-

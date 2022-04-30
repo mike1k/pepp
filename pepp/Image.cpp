@@ -4,10 +4,6 @@
 
 using namespace pepp;
 
-// Explicit templates.
-template class Image<32>;
-template class Image<64>;
-
 template<unsigned int bitsize>
 Image<bitsize>::Image()
 	: m_isParsed(false)
@@ -39,7 +35,7 @@ constexpr PEMachine Image<bitsize>::getMachine() const
 
 
 template<unsigned int bitsize>
-Image<bitsize>::Image(std::string_view filepath)
+pepp::Image<bitsize>::Image(std::string_view filepath)
 	: m_fileName(filepath)
 	, m_isParsed(false)
 {
@@ -233,7 +229,7 @@ bool pepp::Image<bitsize>::isDllOrSystemFile() const
 template<unsigned int bitsize>
 void pepp::Image<bitsize>::relocateImage(uintptr_t imageBase)
 {
-	uintptr_t delta = (imageBase - getImageBase());
+	uintptr_t delta = (imageBase - getImageBase().uintptr());
 
 	m_relocDirectory.forEachEntry(
 		[&](BlockEntry& entry)
@@ -588,4 +584,11 @@ void pepp::Image<bitsize>::mapToBuffer(pepp::Address<> basePtr, const std::vecto
 
 		memcpy((basePtr.ptr<char>() + sec.getVirtualAddress()), &base()[sec.getPtrToRawData()], sec.getSizeOfRawData());
 	}
+}
+
+namespace pepp
+{
+	// Explicit templates.
+	template class Image<32>;
+	template class Image<64>;
 }

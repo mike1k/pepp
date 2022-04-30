@@ -2,13 +2,6 @@
 
 namespace pepp
 {
-	enum class PEMachine
-	{
-		MACHINE_I386 = 0x14c,
-		MACHINE_IA64 = 0x200,
-		MACHINE_AMD64 = 0x8664
-	};
-
 	class FileHeader : pepp::msc::NonCopyable
 	{
 		friend class PEHeader<32>;
