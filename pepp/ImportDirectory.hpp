@@ -62,7 +62,7 @@ namespace pepp
 		}
 
 		void getIATOffsets(std::uint32_t& begin, std::uint32_t& end) noexcept;
-		void getIATRvas(std::uint32_t begin, std::uint32_t& end) noexcept;
+		void getIATRvas(std::uint32_t& begin, std::uint32_t& end) noexcept;
 
 	private:
 		//! Setup the directory
