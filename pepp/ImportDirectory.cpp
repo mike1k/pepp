@@ -501,7 +501,7 @@ void ImportDirectory<bitsize>::getIATOffsets(std::uint32_t& begin, std::uint32_t
 }
 
 template<unsigned int bitsize>
-void pepp::ImportDirectory<bitsize>::getIATRvas(std::uint32_t begin, std::uint32_t& end) noexcept
+void pepp::ImportDirectory<bitsize>::getIATRvas(std::uint32_t& begin, std::uint32_t& end) noexcept
 {
 	//
 	// Null out.
